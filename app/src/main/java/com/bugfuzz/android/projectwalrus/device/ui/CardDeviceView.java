@@ -20,7 +20,7 @@
 package com.bugfuzz.android.projectwalrus.device.ui;
 
 import android.content.Context;
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;

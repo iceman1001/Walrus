@@ -19,8 +19,8 @@
 
 package com.bugfuzz.android.projectwalrus.card.carddata;
 
-import android.support.annotation.Nullable;
-import android.support.annotation.Size;
+import androidx.annotation.Nullable;
+import androidx.annotation.Size;
 
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.util.MiscUtils;

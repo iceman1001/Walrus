@@ -39,7 +39,7 @@
             android:labelFor="@id/read_steps"
             android:text="@string/read_steps"/>
 
-        <android.support.v7.widget.RecyclerView
+        <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/read_steps"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

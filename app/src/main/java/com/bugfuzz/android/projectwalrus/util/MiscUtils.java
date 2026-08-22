@@ -19,7 +19,7 @@
 
 package com.bugfuzz.android.projectwalrus.util;
 
-import android.arch.core.util.Function;
+import androidx.arch.core.util.Function;
 import android.os.Parcel;
 import android.text.SpannableStringBuilder;
 

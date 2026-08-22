@@ -24,9 +24,9 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v7.preference.DialogPreference;
-import android.support.v4.app.DialogFragment;
+import androidx.annotation.NonNull;
+import androidx.preference.DialogPreference;
+import androidx.fragment.app.DialogFragment;
 import android.util.AttributeSet;
 import android.widget.NumberPicker;
 

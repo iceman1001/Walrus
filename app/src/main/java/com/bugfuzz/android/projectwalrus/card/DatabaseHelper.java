@@ -21,7 +21,7 @@ package com.bugfuzz.android.projectwalrus.card;
 
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
-import android.support.annotation.Keep;
+import androidx.annotation.Keep;
 
 import com.j256.ormlite.android.apptools.OrmLiteSqliteOpenHelper;
 import com.j256.ormlite.dao.RuntimeExceptionDao;

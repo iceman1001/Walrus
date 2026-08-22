@@ -20,13 +20,13 @@
 package com.bugfuzz.android.projectwalrus.card.carddata.ui.component;
 
 import android.app.Dialog;
-import android.arch.lifecycle.ViewModelProviders;
+import androidx.lifecycle.ViewModelProvider;
 import android.os.Bundle;
-import android.support.annotation.Keep;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.app.DialogFragment;
-import android.support.v4.content.ContextCompat;
+import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.DialogFragment;
+import androidx.core.content.ContextCompat;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -61,7 +61,7 @@ public class ComponentDialogFragment extends DialogFragment
 
         ComponentSourceAndSink componentSourceAndSink = Parcels.unwrap(getArguments().getParcelable(
                 "source_and_sink"));
-        viewModel = ViewModelProviders.of(this,
+        viewModel = new ViewModelProvider(this,
                 new ComponentViewModel.Factory(componentSourceAndSink)).get(
                         ComponentViewModel.class);
     }

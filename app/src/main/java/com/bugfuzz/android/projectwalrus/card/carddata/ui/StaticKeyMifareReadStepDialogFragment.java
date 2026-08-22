@@ -20,11 +20,11 @@
 package com.bugfuzz.android.projectwalrus.card.carddata.ui;
 
 import android.app.Dialog;
-import android.arch.lifecycle.Observer;
-import android.arch.lifecycle.ViewModelProviders;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.MaterialDialog;
@@ -43,7 +43,7 @@ public class StaticKeyMifareReadStepDialogFragment extends MifareReadStepDialogF
                 (StaticKeyMifareReadStep) getArguments().getSerializable("read_step");
 
         final StaticKeyMifareReadStepDialogViewModel viewModel =
-                ViewModelProviders.of(this,
+                new ViewModelProvider(this,
                         new StaticKeyMifareReadStepDialogViewModel.Factory(staticReadStep))
                         .get(StaticKeyMifareReadStepDialogViewModel.class);
 

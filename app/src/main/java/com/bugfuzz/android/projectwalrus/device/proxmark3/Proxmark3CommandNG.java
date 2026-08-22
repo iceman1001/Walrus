@@ -19,8 +19,8 @@
 
 package com.bugfuzz.android.projectwalrus.device.proxmark3;
 
-import android.support.annotation.LongDef;
-import android.support.annotation.Size;
+import androidx.annotation.LongDef;
+import androidx.annotation.Size;
 
 import org.apache.commons.lang3.ArrayUtils;
 

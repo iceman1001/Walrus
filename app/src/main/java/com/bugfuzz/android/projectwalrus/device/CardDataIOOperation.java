@@ -19,7 +19,7 @@
 
 package com.bugfuzz.android.projectwalrus.device;
 
-import android.support.annotation.StringRes;
+import androidx.annotation.StringRes;
 
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.carddata.CardData;
