@@ -45,6 +45,7 @@ import com.bugfuzz.android.projectwalrus.card.carddata.CardData;
 import com.bugfuzz.android.projectwalrus.device.BulkReadCardDataOperationRunner;
 import com.bugfuzz.android.projectwalrus.device.BulkReadCardsService;
 import com.bugfuzz.android.projectwalrus.device.CardDevice;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 import java.util.ArrayList;
 
@@ -77,6 +78,7 @@ public class BulkReadCardsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_bulk_read_cards);
+        WindowInsetsUtils.insetContentBySystemBars(this);
 
         setSupportActionBar((Toolbar) findViewById(R.id.toolbar));
 

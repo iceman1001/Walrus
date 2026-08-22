@@ -30,6 +30,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.core.view.ViewCompat;
@@ -55,6 +56,7 @@ import com.bugfuzz.android.projectwalrus.card.QueryUtils;
 import com.bugfuzz.android.projectwalrus.device.ui.BulkReadCardsActivity;
 import com.bugfuzz.android.projectwalrus.device.ui.DevicesActivity;
 import com.bugfuzz.android.projectwalrus.ui.SettingsActivity;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 import java.util.List;
 
@@ -110,6 +112,24 @@ public class WalletActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
         }
 
         setContentView(R.layout.activity_wallet);
+        WindowInsetsUtils.insetContentBySystemBars(this);
+
+        // Registered as an OnBackPressedCallback rather than overriding onBackPressed(), so that
+        // it keeps working under predictive back (targetSdk 36 turns that on by default).
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (sv.getVisibility() != View.GONE) {
+                    sv.setIconified(true);
+                    sv.setVisibility(View.GONE);
+                } else {
+                    // Hand back to whatever would have run without this callback.
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                    setEnabled(true);
+                }
+            }
+        });
 
         setSupportActionBar((Toolbar) findViewById(R.id.toolbar));
 
@@ -173,18 +193,36 @@ public class WalletActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
         LocalBroadcastManager.getInstance(this).registerReceiver(walletUpdateBroadcastReceiver,
                 new IntentFilter(QueryUtils.ACTION_WALLET_UPDATE));
 
-        if (EasyPermissions.hasPermissions(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
+        // API 31+ lets the user grant approximate location only, so ask for both and accept
+        // either: WalrusApplication just records whatever the fused provider gives it.
+        if (EasyPermissions.hasPermissions(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                || EasyPermissions.hasPermissions(this,
+                        Manifest.permission.ACCESS_FINE_LOCATION)) {
             gotLocationPermissions();
         } else {
             EasyPermissions.requestPermissions(this, getString(R.string.location_rationale),
-                    LOCATION_REQUEST_CODE, Manifest.permission.ACCESS_FINE_LOCATION);
+                    LOCATION_REQUEST_CODE, Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION);
         }
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
             @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
         EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
+
+        // An approximate-only grant (COARSE yes, FINE no) is possible from API 31 on. It does
+        // not fire @AfterPermissionGranted, because not every requested permission was granted,
+        // but it is still enough to stamp cards with a location.
+        if (requestCode == LOCATION_REQUEST_CODE
+                && !EasyPermissions.hasPermissions(this,
+                        Manifest.permission.ACCESS_FINE_LOCATION)
+                && EasyPermissions.hasPermissions(this,
+                        Manifest.permission.ACCESS_COARSE_LOCATION)) {
+            gotLocationPermissions();
+        }
     }
 
     @AfterPermissionGranted(LOCATION_REQUEST_CODE)
@@ -223,15 +261,6 @@ public class WalletActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
         }
     }
 
-    @Override
-    public void onBackPressed() {
-        if (sv.getVisibility() != View.GONE) {
-            sv.setIconified(true);
-            sv.setVisibility(View.GONE);
-        } else {
-            super.onBackPressed();
-        }
-    }
 
     @Override
     protected void onDestroy() {

@@ -35,6 +35,7 @@ import com.bugfuzz.android.projectwalrus.device.CardDeviceManager;
 import com.bugfuzz.android.projectwalrus.device.proxmark3.Proxmark3Device;
 import com.bugfuzz.android.projectwalrus.device.proxmark3.Proxmark3DeviceIceman;
 import com.bugfuzz.android.projectwalrus.device.ui.FindVersionFragment;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 import java.io.IOException;
 
@@ -68,6 +69,7 @@ public class Proxmark3Activity extends AppCompatActivity
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_proxmark3);
+        WindowInsetsUtils.insetContentBySystemBars(this);
 
         CardDevice cardDevice = CardDeviceManager.INSTANCE.getCardDevices().get(
                 getIntent().getIntExtra(EXTRA_DEVICE, -1));

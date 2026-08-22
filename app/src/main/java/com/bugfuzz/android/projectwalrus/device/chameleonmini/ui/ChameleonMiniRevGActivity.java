@@ -35,6 +35,7 @@ import com.bugfuzz.android.projectwalrus.device.CardDevice;
 import com.bugfuzz.android.projectwalrus.device.CardDeviceManager;
 import com.bugfuzz.android.projectwalrus.device.chameleonmini.ChameleonMiniRevGDevice;
 import com.bugfuzz.android.projectwalrus.device.ui.FindVersionFragment;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 import java.io.IOException;
 
@@ -58,6 +59,7 @@ public class ChameleonMiniRevGActivity extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chameleon_mini_rev_g);
+        WindowInsetsUtils.insetContentBySystemBars(this);
 
         setSupportActionBar((Toolbar) findViewById(R.id.toolbar));
 

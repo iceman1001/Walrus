@@ -35,6 +35,7 @@ import android.widget.Toast;
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.device.CardDevice;
 import com.bugfuzz.android.projectwalrus.device.CardDeviceManager;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 public class DevicesActivity extends AppCompatActivity
         implements CardDeviceAdapter.OnCardDeviceClickCallback {
@@ -57,6 +58,7 @@ public class DevicesActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_devices);
+        WindowInsetsUtils.insetContentBySystemBars(this);
 
         setSupportActionBar((Toolbar) findViewById(R.id.toolbar));
 

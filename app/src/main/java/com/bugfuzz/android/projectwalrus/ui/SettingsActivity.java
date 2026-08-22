@@ -27,12 +27,15 @@ import androidx.preference.PreferenceFragmentCompat;
 
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.ui.DeleteAllCardsPreference;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 public class SettingsActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        WindowInsetsUtils.insetContentBySystemBars(this);
 
         getSupportFragmentManager().beginTransaction()
                 .replace(android.R.id.content, new SettingsFragment())

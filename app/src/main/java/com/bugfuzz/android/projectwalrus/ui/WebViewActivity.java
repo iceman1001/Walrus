@@ -24,6 +24,8 @@ import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import android.webkit.WebView;
 
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
+
 public class WebViewActivity extends AppCompatActivity {
 
     private static final String EXTRA_URL =
@@ -36,6 +38,7 @@ public class WebViewActivity extends AppCompatActivity {
         WebView webView = new WebView(this);
 
         setContentView(webView);
+        WindowInsetsUtils.insetContentBySystemBars(this);
 
         Intent intent = getIntent();
 

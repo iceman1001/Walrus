@@ -25,6 +25,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
+import android.os.Build;
 import android.os.Handler;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
@@ -100,10 +101,21 @@ public enum CardDeviceManager {
                     if (usbManager.hasPermission(usbDevice)) {
                         new Thread(new CreateUsbDeviceRunnable(context, usbDevice)).start();
                     } else {
+                        // Explicit (setClass + setPackage) so Android 14+ still delivers it,
+                        // and MUTABLE because UsbManager fills in EXTRA_DEVICE and
+                        // EXTRA_PERMISSION_GRANTED on the way out; an immutable PendingIntent
+                        // would reach UsbPermissionReceiver with neither extra set.
                         Intent permissionIntent = new Intent(ACTION_USB_PERMISSION_RESULT);
                         permissionIntent.setClass(context, UsbPermissionReceiver.class);
+                        permissionIntent.setPackage(context.getPackageName());
+
+                        int flags = 0;
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            flags |= PendingIntent.FLAG_MUTABLE;
+                        }
+
                         usbManager.requestPermission(usbDevice, PendingIntent.getBroadcast(
-                                context, 0, permissionIntent, 0));
+                                context, 0, permissionIntent, flags));
 
                         askingForUsbPermission = true;
                     }

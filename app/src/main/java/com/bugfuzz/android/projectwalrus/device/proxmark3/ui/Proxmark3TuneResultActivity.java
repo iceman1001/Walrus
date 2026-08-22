@@ -32,6 +32,7 @@ import android.widget.TextView;
 
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.device.proxmark3.Proxmark3Device;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.data.Entry;
@@ -60,6 +61,7 @@ public class Proxmark3TuneResultActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_proxmark3_tune_results);
+        WindowInsetsUtils.insetContentBySystemBars(this);
 
         Proxmark3Device.TuneResult tuneResult = Parcels.unwrap(getIntent().getParcelableExtra(
                 EXTRA_TUNE_RESULT));
