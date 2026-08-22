@@ -104,20 +104,18 @@ dependencies {
 
     implementation 'com.google.guava:guava:33.3.1-android'
 
-    implementation 'com.afollestad.material-dialogs:core:0.9.6.0'
-    implementation 'com.github.PhilJay:MPAndroidChart:v3.0.3'
+    implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
     implementation 'com.github.felHR85:UsbSerial:6.1.0'
-    implementation 'com.google.android.gms:play-services-location:15.0.1'
-    implementation 'com.google.android.gms:play-services-maps:15.0.1'
-    implementation 'com.j256.ormlite:ormlite-android:5.0'
-    implementation 'com.j256.ormlite:ormlite-core:5.0'
-    implementation 'io.github.yavski:fab-speed-dial:1.0.6'
-    implementation 'org.apache.commons:commons-lang3:3.5'
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
+    implementation 'com.google.android.gms:play-services-maps:19.0.0'
+    // ormlite-android 6.x bundles ormlite-core; declaring both duplicates every class.
+    implementation 'com.j256.ormlite:ormlite-android:6.1'
+    implementation 'com.leinardi.android:speed-dial:3.3.0'
+    implementation 'org.apache.commons:commons-lang3:3.17.0'
     implementation 'org.parceler:parceler-api:1.1.6'
     implementation 'pub.devrel:easypermissions:3.0.0'
 
-    debugImplementation 'com.squareup.leakcanary:leakcanary-android:1.5.4'
-    releaseImplementation 'com.squareup.leakcanary:leakcanary-android-no-op:1.5.4'
+    debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.14'
 
     annotationProcessor 'org.parceler:parceler:1.1.6'
 

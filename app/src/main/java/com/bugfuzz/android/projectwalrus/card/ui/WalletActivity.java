@@ -58,8 +58,8 @@ import com.bugfuzz.android.projectwalrus.ui.SettingsActivity;
 
 import java.util.List;
 
-import io.github.yavski.fabspeeddial.FabSpeedDial;
-import io.github.yavski.fabspeeddial.SimpleMenuListenerAdapter;
+import com.leinardi.android.speeddial.SpeedDialActionItem;
+import com.leinardi.android.speeddial.SpeedDialView;
 import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
 
@@ -149,20 +149,21 @@ public class WalletActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
                     }
                 });
 
-        FabSpeedDial fabSpeedDial = findViewById(R.id.floatingActionButton);
-        fabSpeedDial.setMenuListener(new SimpleMenuListenerAdapter() {
+        SpeedDialView fabSpeedDial = findViewById(R.id.floatingActionButton);
+        fabSpeedDial.inflate(R.menu.menu_wallet_fab);
+        fabSpeedDial.setOnActionSelectedListener(new SpeedDialView.OnActionSelectedListener() {
             @Override
-            public boolean onMenuItemSelected(MenuItem menuItem) {
-                switch (menuItem.getItemId()) {
+            public boolean onActionSelected(SpeedDialActionItem actionItem) {
+                switch (actionItem.getId()) {
                     case R.id.add_new_card:
                         CardActivity.startActivity(WalletActivity.this,
                                 CardActivity.Mode.EDIT, null, null);
-                        return true;
+                        return false;
 
                     case R.id.bulk_read_cards:
                         CardActivity.startActivity(WalletActivity.this,
                                 CardActivity.Mode.EDIT_BULK_READ_CARD_TEMPLATE, null, null);
-                        return true;
+                        return false;
                 }
 
                 return false;

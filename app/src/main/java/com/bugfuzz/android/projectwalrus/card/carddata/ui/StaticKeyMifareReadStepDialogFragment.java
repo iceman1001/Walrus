@@ -20,21 +20,28 @@
 package com.bugfuzz.android.projectwalrus.card.carddata.ui;
 
 import android.app.Dialog;
+import android.content.DialogInterface;
+import android.view.View;
+import android.widget.Button;
+
+import androidx.appcompat.app.AlertDialog;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.afollestad.materialdialogs.DialogAction;
-import com.afollestad.materialdialogs.MaterialDialog;
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.carddata.MifareReadStep;
 import com.bugfuzz.android.projectwalrus.card.carddata.StaticKeyMifareReadStep;
 import com.bugfuzz.android.projectwalrus.databinding.StaticKeyMifareReadStepDialogBinding;
+import com.bugfuzz.android.projectwalrus.util.DialogUtils;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 // TODO XXX: setError on views like component dialogs
 public class StaticKeyMifareReadStepDialogFragment extends MifareReadStepDialogFragment {
+
+    private StaticKeyMifareReadStepDialogViewModel viewModel;
 
     @Override
     @NonNull
@@ -42,28 +49,29 @@ public class StaticKeyMifareReadStepDialogFragment extends MifareReadStepDialogF
         StaticKeyMifareReadStep staticReadStep =
                 (StaticKeyMifareReadStep) getArguments().getSerializable("read_step");
 
-        final StaticKeyMifareReadStepDialogViewModel viewModel =
-                new ViewModelProvider(this,
-                        new StaticKeyMifareReadStepDialogViewModel.Factory(staticReadStep))
-                        .get(StaticKeyMifareReadStepDialogViewModel.class);
+        viewModel = new ViewModelProvider(this,
+                new StaticKeyMifareReadStepDialogViewModel.Factory(staticReadStep))
+                .get(StaticKeyMifareReadStepDialogViewModel.class);
 
-        final MaterialDialog dialog = new MaterialDialog.Builder(getActivity())
-                .title(staticReadStep != null ? R.string.edit_mifare_static_key_read_step :
+        View customView = DialogUtils.inflateCustomView(requireActivity(),
+                R.layout.layout_static_key_mifare_read_step_dialog);
+
+        final Dialog dialog = new MaterialAlertDialogBuilder(getActivity())
+                .setTitle(staticReadStep != null ? R.string.edit_mifare_static_key_read_step :
                         R.string.add_mifare_static_key_read_step)
-                .customView(R.layout.layout_static_key_mifare_read_step_dialog, true)
-                .positiveText(staticReadStep != null ? android.R.string.ok : R.string.add)
-                .onPositive(new MaterialDialog.SingleButtonCallback() {
-                    @Override
-                    public void onClick(@NonNull MaterialDialog dialog,
-                            @NonNull DialogAction which) {
-                        viewModel.onAddClick();
-                    }
-                })
-                .negativeText(android.R.string.cancel)
-                .build();
+                .setView(DialogUtils.asCustomView(requireActivity(), customView, true))
+                .setPositiveButton(staticReadStep != null ? android.R.string.ok : R.string.add,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                viewModel.onAddClick();
+                            }
+                        })
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
 
         StaticKeyMifareReadStepDialogBinding binding = StaticKeyMifareReadStepDialogBinding.bind(
-                dialog.getCustomView());
+                customView);
         binding.setLifecycleOwner(this);
 
         binding.setViewModel(viewModel);
@@ -71,7 +79,7 @@ public class StaticKeyMifareReadStepDialogFragment extends MifareReadStepDialogF
         viewModel.getIsValid().observe(this, new Observer<Boolean>() {
             @Override
             public void onChanged(@Nullable Boolean isValid) {
-                dialog.getActionButton(DialogAction.POSITIVE).setEnabled(isValid);
+                updatePositiveButton();
             }
         });
 
@@ -84,5 +92,29 @@ public class StaticKeyMifareReadStepDialogFragment extends MifareReadStepDialogF
         });
 
         return dialog;
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+
+        // The buttons of an AlertDialog only exist once it has been shown, unlike
+        // material-dialogs' getActionButton().
+        updatePositiveButton();
+    }
+
+    private void updatePositiveButton() {
+        Dialog dialog = getDialog();
+        if (!(dialog instanceof AlertDialog)) {
+            return;
+        }
+
+        Button button = ((AlertDialog) dialog).getButton(DialogInterface.BUTTON_POSITIVE);
+        if (button == null) {
+            return;
+        }
+
+        Boolean isValid = viewModel.getIsValid().getValue();
+        button.setEnabled(isValid != null && isValid);
     }
 }

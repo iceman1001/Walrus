@@ -33,16 +33,19 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import android.view.View;
 
-import com.afollestad.materialdialogs.MaterialDialog;
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.carddata.CardData;
 import com.bugfuzz.android.projectwalrus.device.CardDevice;
 import com.bugfuzz.android.projectwalrus.device.CardDeviceManager;
+import com.bugfuzz.android.projectwalrus.util.DialogUtils;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class PickCardDataTargetDialogFragment extends DialogFragment
         implements CardDeviceAdapter.OnCardDeviceClickCallback {
 
     private RecyclerView.Adapter adapter;
+
+    private View customView;
 
     private final BroadcastReceiver deviceUpdateBroadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -104,17 +107,20 @@ public class PickCardDataTargetDialogFragment extends DialogFragment
                 break;
         }
 
-        return new MaterialDialog.Builder(getActivity())
-                .title(titleId)
-                .customView(R.layout.dialog_pick_card_data_target, true)
-                .build();
+        customView = DialogUtils.inflateCustomView(requireActivity(),
+                R.layout.dialog_pick_card_data_target);
+
+        return new MaterialAlertDialogBuilder(getActivity())
+                .setTitle(titleId)
+                .setView(DialogUtils.asCustomView(requireActivity(), customView, true))
+                .create();
     }
 
     @Override
     public void onStart() {
         super.onStart();
 
-        View dialogView = ((MaterialDialog) getDialog()).getCustomView();
+        View dialogView = customView;
         assert dialogView != null;
 
         RecyclerView cardDeviceList = dialogView.findViewById(R.id.card_device_list);

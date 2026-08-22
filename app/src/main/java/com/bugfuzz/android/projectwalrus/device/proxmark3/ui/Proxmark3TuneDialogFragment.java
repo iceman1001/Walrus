@@ -22,20 +22,27 @@ package com.bugfuzz.android.projectwalrus.device.proxmark3.ui;
 import android.app.Dialog;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.TextView;
+
 import androidx.fragment.app.DialogFragment;
 
-import com.afollestad.materialdialogs.MaterialDialog;
 import com.bugfuzz.android.projectwalrus.R;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class Proxmark3TuneDialogFragment extends DialogFragment {
 
     @NonNull
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
-        return new MaterialDialog.Builder(getActivity())
-                .content(getActivity().getString(R.string.tuning_progress))
-                .progress(true, 0)
-                .cancelable(false)
-                .build();
+        View view = LayoutInflater.from(getActivity()).inflate(R.layout.dialog_progress, null,
+                false);
+        ((TextView) view.findViewById(R.id.message)).setText(R.string.tuning_progress);
+
+        return new MaterialAlertDialogBuilder(getActivity())
+                .setView(view)
+                .setCancelable(false)
+                .create();
     }
 }

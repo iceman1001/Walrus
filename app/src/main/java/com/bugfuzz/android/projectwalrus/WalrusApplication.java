@@ -45,7 +45,6 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.squareup.leakcanary.LeakCanary;
 
 public class WalrusApplication extends Application {
 
@@ -105,10 +104,8 @@ public class WalrusApplication extends Application {
     public void onCreate() {
         super.onCreate();
 
-        if (LeakCanary.isInAnalyzerProcess(this)) {
-            return;
-        }
-        LeakCanary.install(this);
+        // LeakCanary 2.x installs itself via a ContentProvider; no manual install needed,
+        // and it is a debugImplementation-only dependency now.
 
         context = getApplicationContext();
 

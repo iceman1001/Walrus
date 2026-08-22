@@ -21,22 +21,26 @@ package com.bugfuzz.android.projectwalrus.card.ui;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.DialogFragment;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.core.content.ContextCompat;
 import androidx.preference.DialogPreference;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.util.AttributeSet;
 import android.widget.Toast;
 
-import com.afollestad.materialdialogs.DialogAction;
-import com.afollestad.materialdialogs.MaterialDialog;
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.Card;
 import com.bugfuzz.android.projectwalrus.card.DatabaseHelper;
 import com.bugfuzz.android.projectwalrus.card.QueryUtils;
 import com.j256.ormlite.android.apptools.OpenHelperManager;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.j256.ormlite.table.TableUtils;
 
 import java.sql.SQLException;
@@ -51,42 +55,47 @@ public class DeleteAllCardsPreference extends DialogPreference {
         @NonNull
         @Override
         public Dialog onCreateDialog(final Bundle savedInstanceState) {
-            return new MaterialDialog.Builder(getActivity())
-                    .title(R.string.warning)
-                    .titleColorRes(R.color.secondaryColor)
-                    .content(R.string.delete_all_cards)
-                    .positiveText(R.string.delete_button)
-                    .onPositive(new MaterialDialog.SingleButtonCallback() {
-                        @Override
-                        public void onClick(@NonNull MaterialDialog dialog,
-                                @NonNull DialogAction which) {
-                            try {
-                                TableUtils.clearTable(
-                                        OpenHelperManager.getHelper(getContext(),
-                                                DatabaseHelper.class)
-                                                .getConnectionSource(),
-                                        Card.class);
-                            } catch (SQLException e) {
-                                return;
-                            }
-                            LocalBroadcastManager.getInstance(getContext()).sendBroadcast(
-                                    new Intent(QueryUtils.ACTION_WALLET_UPDATE));
+            // material-dialogs' titleColorRes() has no MaterialAlertDialogBuilder
+            // equivalent, so colour the title text itself.
+            SpannableString title = new SpannableString(getString(R.string.warning));
+            title.setSpan(
+                    new ForegroundColorSpan(ContextCompat.getColor(requireContext(),
+                            R.color.secondaryColor)),
+                    0, title.length(), Spanned.SPAN_INCLUSIVE_EXCLUSIVE);
 
-                            Toast.makeText(getContext(), R.string.all_cards_deleted,
-                                    Toast.LENGTH_LONG).show();
+            return new MaterialAlertDialogBuilder(getActivity())
+                    .setTitle(title)
+                    .setMessage(R.string.delete_all_cards)
+                    .setPositiveButton(R.string.delete_button,
+                            new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    try {
+                                        TableUtils.clearTable(
+                                                OpenHelperManager.getHelper(getContext(),
+                                                        DatabaseHelper.class)
+                                                        .getConnectionSource(),
+                                                Card.class);
+                                    } catch (SQLException e) {
+                                        return;
+                                    }
+                                    LocalBroadcastManager.getInstance(getContext()).sendBroadcast(
+                                            new Intent(QueryUtils.ACTION_WALLET_UPDATE));
 
-                            dialog.dismiss();
-                        }
-                    })
-                    .negativeText(R.string.cancel_button)
-                    .onNegative(new MaterialDialog.SingleButtonCallback() {
-                        @Override
-                        public void onClick(@NonNull MaterialDialog dialog,
-                                @NonNull DialogAction which) {
-                            dialog.dismiss();
-                        }
-                    })
-                    .build();
+                                    Toast.makeText(getContext(), R.string.all_cards_deleted,
+                                            Toast.LENGTH_LONG).show();
+
+                                    dialog.dismiss();
+                                }
+                            })
+                    .setNegativeButton(R.string.cancel_button,
+                            new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    dialog.dismiss();
+                                }
+                            })
+                    .create();
         }
     }
 }

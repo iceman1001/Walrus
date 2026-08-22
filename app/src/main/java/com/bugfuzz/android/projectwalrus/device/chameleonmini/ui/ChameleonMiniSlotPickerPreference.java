@@ -22,6 +22,7 @@ package com.bugfuzz.android.projectwalrus.device.chameleonmini.ui;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.res.TypedArray;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
@@ -30,9 +31,8 @@ import androidx.fragment.app.DialogFragment;
 import android.util.AttributeSet;
 import android.widget.NumberPicker;
 
-import com.afollestad.materialdialogs.DialogAction;
-import com.afollestad.materialdialogs.MaterialDialog;
 import com.bugfuzz.android.projectwalrus.R;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 
 public class ChameleonMiniSlotPickerPreference extends DialogPreference {
@@ -104,28 +104,24 @@ public class ChameleonMiniSlotPickerPreference extends DialogPreference {
             np.setMinValue(getPreference().minSlot);
             np.setMaxValue(getPreference().maxSlot);
             np.setValue(getPreference().getValue());
-            boolean wrapInScrollView = false;
-            return new MaterialDialog.Builder(getActivity())
-                    .title("Default Card Slot")
-                    .customView(np, wrapInScrollView)
-                    .positiveText("Set")
-                    .onPositive(new MaterialDialog.SingleButtonCallback() {
+            return new MaterialAlertDialogBuilder(getActivity())
+                    .setTitle("Default Card Slot")
+                    .setView(np)
+                    .setPositiveButton("Set", new DialogInterface.OnClickListener() {
                         @Override
-                        public void onClick(@NonNull MaterialDialog dialog,
-                                @NonNull DialogAction which) {
+                        public void onClick(DialogInterface dialog, int which) {
                             getPreference().setValue(np.getValue());
                             dialog.dismiss();
                         }
                     })
-                    .negativeText(R.string.cancel_button)
-                    .onNegative(new MaterialDialog.SingleButtonCallback() {
-                        @Override
-                        public void onClick(@NonNull MaterialDialog dialog,
-                                @NonNull DialogAction which) {
-                            dialog.dismiss();
-                        }
-                    })
-                    .build();
+                    .setNegativeButton(R.string.cancel_button,
+                            new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    dialog.dismiss();
+                                }
+                            })
+                    .create();
         }
     }
 

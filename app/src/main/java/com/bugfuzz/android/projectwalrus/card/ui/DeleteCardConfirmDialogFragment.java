@@ -21,13 +21,13 @@ package com.bugfuzz.android.projectwalrus.card.ui;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.DialogFragment;
 
-import com.afollestad.materialdialogs.DialogAction;
-import com.afollestad.materialdialogs.MaterialDialog;
 import com.bugfuzz.android.projectwalrus.R;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class DeleteCardConfirmDialogFragment extends DialogFragment {
 
@@ -53,28 +53,27 @@ public class DeleteCardConfirmDialogFragment extends DialogFragment {
     @NonNull
     @Override
     public Dialog onCreateDialog(final Bundle savedInstanceState) {
-        return new MaterialDialog.Builder(getActivity())
-                .title(R.string.delete_card)
-                .content(R.string.delete_message)
-                .positiveText(R.string.delete_button)
-                .onPositive(new MaterialDialog.SingleButtonCallback() {
-                    @Override
-                    public void onClick(@NonNull MaterialDialog dialog,
-                            @NonNull DialogAction which) {
-                        ((OnDeleteCardConfirmCallback) getActivity()).onDeleteCardConfirm(
-                                getArguments().getInt("callback_id"));
-                        dialog.dismiss();
-                    }
-                })
-                .negativeText(R.string.cancel_button)
-                .onNegative(new MaterialDialog.SingleButtonCallback() {
-                    @Override
-                    public void onClick(@NonNull MaterialDialog dialog,
-                            @NonNull DialogAction which) {
-                        dialog.dismiss();
-                    }
-                })
-                .build();
+        return new MaterialAlertDialogBuilder(getActivity())
+                .setTitle(R.string.delete_card)
+                .setMessage(R.string.delete_message)
+                .setPositiveButton(R.string.delete_button,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                ((OnDeleteCardConfirmCallback) getActivity())
+                                        .onDeleteCardConfirm(
+                                                getArguments().getInt("callback_id"));
+                                dialog.dismiss();
+                            }
+                        })
+                .setNegativeButton(R.string.cancel_button,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                            }
+                        })
+                .create();
     }
 
     public interface OnDeleteCardConfirmCallback {

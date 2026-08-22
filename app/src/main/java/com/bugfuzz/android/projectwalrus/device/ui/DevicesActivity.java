@@ -23,6 +23,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.annotation.SuppressLint;
 import android.os.Bundle;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.appcompat.app.ActionBar;
@@ -48,6 +49,10 @@ public class DevicesActivity extends AppCompatActivity
     };
 
     @Override
+    // InvalidSetHasFixedSize is a false positive here: lint resolves @id/card_device_list to the
+    // wrap_content copy in dialog_pick_card_data_target.xml. The one this activity inflates
+    // (activity_devices.xml) is match_parent.
+    @SuppressLint("InvalidSetHasFixedSize")
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
