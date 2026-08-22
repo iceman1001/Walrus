@@ -251,7 +251,32 @@ public enum CardDeviceManager {
             }
         }
 
-        return null;
+        return onlyBluetoothCardDeviceClass();
+    }
+
+    /**
+     * People rename these modules, so a name that matches nothing is not a good enough reason to
+     * refuse. RFIDtools does not filter on the name at all - the user picked the device from a
+     * list, which is the real signal - so fall back to the sole Bluetooth-capable device class
+     * when there is exactly one. If the guess is wrong the connection simply fails to open.
+     */
+    @Nullable
+    private static Class<? extends CardDevice> onlyBluetoothCardDeviceClass() {
+        Class<? extends CardDevice> only = null;
+
+        for (Class<? extends CardDevice> klass : cardDeviceClasses) {
+            if (klass.getAnnotation(CardDevice.BluetoothIds.class) == null) {
+                continue;
+            }
+
+            if (only != null) {
+                return null;
+            }
+
+            only = klass;
+        }
+
+        return only;
     }
 
     /**

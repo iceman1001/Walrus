@@ -23,7 +23,12 @@ import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+
+import androidx.core.content.ContextCompat;
 
 import com.bugfuzz.android.projectwalrus.R;
 
@@ -52,12 +57,23 @@ public class BluetoothSerialTransport implements SerialCardDevice.Transport {
 
     private static final long SETTLE_DELAY_MS = 500;
 
+    /**
+     * RFIDtools (libcom/AbsBluetoothSpp) retries the connect several times before giving up;
+     * these modules do fail the first attempt fairly often. Unlike that implementation this one
+     * builds a fresh socket per attempt, because a BluetoothSocket that has failed to connect
+     * cannot be reused.
+     */
+    private static final int CONNECT_ATTEMPTS = 5;
+
+    private static final long RETRY_DELAY_MS = 750;
+
     private final Context context;
     private final BluetoothDevice bluetoothDevice;
 
     private BluetoothSocket socket;
     private OutputStream outputStream;
     private Thread readThread;
+    private BroadcastReceiver disconnectReceiver;
     private volatile boolean closing;
 
     public BluetoothSerialTransport(Context context, BluetoothDevice bluetoothDevice) {
@@ -74,12 +90,6 @@ public class BluetoothSerialTransport implements SerialCardDevice.Transport {
     // it before it ever offers a device to connect to.
     @SuppressLint("MissingPermission")
     public void open(final Listener listener) throws IOException {
-        try {
-            socket = bluetoothDevice.createRfcommSocketToServiceRecord(SPP_UUID);
-        } catch (SecurityException e) {
-            throw new IOException(context.getString(R.string.bluetooth_permission_missing));
-        }
-
         // Discovery is very expensive while a connection is being set up, and the platform
         // documentation asks callers to cancel it first.
         try {
@@ -91,13 +101,31 @@ public class BluetoothSerialTransport implements SerialCardDevice.Transport {
             // Scanning permission is optional for connecting; carry on.
         }
 
-        try {
-            socket.connect();
-        } catch (SecurityException e) {
-            closeSocketQuietly();
-            throw new IOException(context.getString(R.string.bluetooth_permission_missing));
-        } catch (IOException e) {
-            closeSocketQuietly();
+        IOException lastFailure = null;
+
+        for (int attempt = 0; attempt < CONNECT_ATTEMPTS; ++attempt) {
+            try {
+                socket = bluetoothDevice.createRfcommSocketToServiceRecord(SPP_UUID);
+                socket.connect();
+                lastFailure = null;
+                break;
+            } catch (SecurityException e) {
+                closeSocketQuietly();
+                throw new IOException(context.getString(R.string.bluetooth_permission_missing));
+            } catch (IOException e) {
+                closeSocketQuietly();
+                lastFailure = e;
+
+                // CHECKSTYLE:OFF EmptyCatchBlock
+                try {
+                    Thread.sleep(RETRY_DELAY_MS);
+                } catch (InterruptedException ignored) {
+                }
+                // CHECKSTYLE:ON EmptyCatchBlock
+            }
+        }
+
+        if (lastFailure != null) {
             throw new IOException(context.getString(R.string.bluetooth_connect_failed));
         }
 
@@ -147,6 +175,24 @@ public class BluetoothSerialTransport implements SerialCardDevice.Transport {
         }, "walrus-bt-read");
         readThread.setDaemon(true);
         readThread.start();
+
+        // A read only fails once the stack notices the link is gone, which can lag. RFIDtools
+        // watches ACTION_ACL_DISCONNECTED instead; do both, and let onTransportClosed be the one
+        // that deduplicates.
+        disconnectReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context receiverContext, Intent intent) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                if (device != null && device.getAddress().equals(bluetoothDevice.getAddress())
+                        && !closing) {
+                    listener.onTransportClosed(new IOException("Bluetooth link dropped"));
+                }
+            }
+        };
+        ContextCompat.registerReceiver(context, disconnectReceiver,
+                new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED),
+                ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     @Override
@@ -167,6 +213,17 @@ public class BluetoothSerialTransport implements SerialCardDevice.Transport {
     @Override
     public void close() {
         closing = true;
+
+        if (disconnectReceiver != null) {
+            // CHECKSTYLE:OFF EmptyCatchBlock
+            try {
+                context.unregisterReceiver(disconnectReceiver);
+            } catch (IllegalArgumentException ignored) {
+            }
+            // CHECKSTYLE:ON EmptyCatchBlock
+
+            disconnectReceiver = null;
+        }
 
         closeSocketQuietly();
 

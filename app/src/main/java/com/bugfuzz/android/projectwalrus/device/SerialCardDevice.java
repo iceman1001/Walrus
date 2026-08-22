@@ -49,6 +49,8 @@ public abstract class SerialCardDevice<T> extends CardDevice {
 
     private volatile boolean receiving;
     private byte[] buffer = new byte[0];
+    private final java.util.concurrent.atomic.AtomicBoolean disconnected =
+            new java.util.concurrent.atomic.AtomicBoolean();
 
     protected SerialCardDevice(Context context, Transport transport, String status)
             throws IOException {
@@ -109,7 +111,11 @@ public abstract class SerialCardDevice<T> extends CardDevice {
      * device goes out of range or is switched off. USB has its own detach broadcast instead.
      */
     protected void onTransportClosed(IOException reason) {
-        CardDeviceManager.INSTANCE.onDeviceDisconnected(context, this);
+        // Reported by both the read thread and the ACL_DISCONNECTED receiver, whichever notices
+        // first; the device should only be dropped once.
+        if (disconnected.compareAndSet(false, true)) {
+            CardDeviceManager.INSTANCE.onDeviceDisconnected(context, this);
+        }
     }
 
     @Override
