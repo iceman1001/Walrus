@@ -32,46 +32,63 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
-class Proxmark3Command {
+class Proxmark3CommandNG {
 
-    static final long ACK = 0xff;
-    static final long DEBUG_PRINT_STRING = 0x100;
-    static final long VERSION = 0x107;
-    static final long CAPABILITIES = 0x0112;
+    static final short ACK = 0xff;
+    static final short DEBUG_PRINT_STRING = 0x100;
+    static final short VERSION = 0x107;
+    static final short CAPABILITIES = 0x0112;
 
-    static final long HID_DEMOD_FSK = 0x20b; //CMD_LF_HID_WATCH
-    static final long HID_CLONE_TAG = 0x210;
-    static final long READER_ISO_14443A = 0x385;
+    static final short HID_DEMOD_FSK = 0x20b; // CMD_LF_HID_WATCH
+    static final short HID_CLONE_TAG = 0x210;
+    static final short READER_ISO_14443A = 0x385;
 
-    static final long MEASURE_ANTENNA_TUNING = 0x400;
-    static final long MEASURED_ANTENNA_TUNING = 0x410;
+    static final short MEASURE_ANTENNA_TUNING = 0x400;
+    static final short MEASURED_ANTENNA_TUNING = 0x410;
 
-    static final long CMD_MEASURE_ANTENNA_TUNING = 0x0400;
-    static final long CMD_MEASURE_ANTENNA_TUNING_HF = 0x0401;
-    static final long CMD_MEASURE_ANTENNA_TUNING_LF = 0x0402;
+    static final short CMD_MEASURE_ANTENNA_TUNING = 0x0400;
+    static final short CMD_MEASURE_ANTENNA_TUNING_HF = 0x0401;
+    static final short CMD_MEASURE_ANTENNA_TUNING_LF = 0x0402;
 
-    static final long MIFARE_READBL = 0x620;
+    static final short MIFARE_READBL = 0x620;
 
-    static final long MEASURE_ANTENNA_TUNING_FLAG_TUNE_LF = 1;
-    static final long MEASURE_ANTENNA_TUNING_FLAG_TUNE_HF = 2;
+    static final short MEASURE_ANTENNA_TUNING_FLAG_TUNE_LF = 1;
+    static final short MEASURE_ANTENNA_TUNING_FLAG_TUNE_HF = 2;
 
-    static final long ISO14A_CONNECT = 1 << 0;
+    static final short ISO14A_CONNECT = 1 << 0;
+
+    static final long COMMANDNG_PREAMBLE_MAGIC = 0x61334d50; // PM3a
+    static final short COMMANDNG_POSTAMBLE_MAGIC = 0x3361;     // a3
 
     // Success (no error)
     static final long PM3_SUCCESS = 0;
 
-    @Opcode
-    final long op;
-    final long[] args;
+    // params
+    short cmd = 0;
+    short length = 0;
+    long magic = 0;
+    short crc = 0;
+    final long[] oldargs;
     final byte[] data;
+    boolean ng = true;
 
-    Proxmark3Command(@Opcode long op, @Size(3) long[] args, @Size(max = 512) byte[] data) {
-        this.op = op;
+    Proxmark3CommandNG(
+                short cmd,
+                short length,
+                @Size(3) long[] oldargs,
+                @Size(max = 512) byte[] data,
+                boolean ng
+                    ) {
+        this.cmd = cmd;
+        this.length = length;
+        this.magic = COMMANDNG_PREAMBLE_MAGIC;
+        this.crc = COMMANDNG_POSTAMBLE_MAGIC;
+        this.ng = ng;
 
-        if (args.length != 3) {
+        if (oldargs.length != 3) {
             throw new IllegalArgumentException("Invalid number of args");
         }
-        this.args = args;
+        this.oldargs = oldargs;
 
         if (data.length > 512) {
             throw new IllegalArgumentException("Data too long");
@@ -79,23 +96,27 @@ class Proxmark3Command {
         this.data = Arrays.copyOf(data, 512);
     }
 
-    Proxmark3Command(@Opcode long op, @Size(max = 512) long[] args) {
-        this(op, args, new byte[0]);
+    Proxmark3CommandNG(
+            short cmd,
+            short length,
+            @Size(3) long[] oldargs,
+            boolean ng) {
+        this(cmd, length, oldargs, new byte[0], ng);
     }
 
-    Proxmark3Command(@Opcode @SuppressWarnings("SameParameterValue") long op) {
-        this(op, new long[3]);
+    Proxmark3CommandNG(short cmd) {
+        this(cmd,(short)0, new long[3], true);
     }
 
     static int getByteLength() {
         return 8 + 3 * 8 + 512;
     }
 
-    static Proxmark3Command fromBytes(byte[] bytes) {
+    static Proxmark3CommandNG fromBytes(byte[] bytes) {
         ByteBuffer bb = ByteBuffer.wrap(bytes);
         bb.order(ByteOrder.LITTLE_ENDIAN);
 
-        long op = bb.getLong();
+        short cmd = bb.getShort();
 
         long[] args = new long[3];
         for (int i = 0; i < 3; ++i) {
@@ -105,16 +126,16 @@ class Proxmark3Command {
         byte[] data = new byte[512];
         bb.get(data);
 
-        return new Proxmark3Command(op, args, data);
+        return new Proxmark3CommandNG(cmd, (short)0, args, data, true);
     }
 
     byte[] toBytes() {
         ByteBuffer bb = ByteBuffer.allocate(getByteLength());
         bb.order(ByteOrder.LITTLE_ENDIAN);
 
-        bb.putLong(op);
+        bb.putShort(cmd);
 
-        for (long arg : args) {
+        for (long arg : oldargs) {
             bb.putLong(arg);
         }
 
@@ -129,27 +150,11 @@ class Proxmark3Command {
 
     @Override
     public String toString() {
-        return "<Proxmark3Command " + op + ", args " + Arrays.toString(args) + ", data "
+        return "<Proxmark3Command " + cmd + ", args " + Arrays.toString(oldargs) + ", data "
                 + Arrays.toString(data) + ">";
     }
 
     public String dataAsString() {
-        return new String(ArrayUtils.subarray(data, 0, (int) args[0]));
-    }
-
-    @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.LOCAL_VARIABLE})
-    @Retention(RetentionPolicy.SOURCE)
-    @LongDef({
-            ACK,
-            DEBUG_PRINT_STRING,
-            VERSION,
-            HID_DEMOD_FSK,
-            HID_CLONE_TAG,
-            READER_ISO_14443A,
-            MEASURE_ANTENNA_TUNING,
-            MEASURED_ANTENNA_TUNING,
-            MIFARE_READBL
-    })
-    public @interface Opcode {
+        return new String(ArrayUtils.subarray(data, 0, (int) oldargs[0]));
     }
 }
