@@ -34,6 +34,22 @@
     <!-- API 33+: needed for that service's own notification to be shown. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!--
+      The Proxmark3's Blue Shark add-on is a Bluetooth Classic (RFCOMM/SPP) module. BLUETOOTH and
+      BLUETOOTH_ADMIN are the pre-API-31 spelling of the two runtime permissions below them.
+      -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30"/>
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s"/>
+
     <application
         android:name=".WalrusApplication"
         android:allowBackup="true"
@@ -70,18 +86,10 @@
             </intent-filter>
         </receiver>
 
-        <!--
-          ForegroundServicePermission is suppressed because lint only knows about the
-          manifest-declared permissions that satisfy the connectedDevice type. The other way
-          to satisfy it, which is the one this app uses, is a runtime USB device permission
-          granted by the user through UsbManager.requestPermission() - see CardDeviceManager.
-          Bulk reading can only start once that grant exists.
-          -->
         <service
             android:name=".device.BulkReadCardsService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice"
-            tools:ignore="ForegroundServicePermission">
+            android:foregroundServiceType="connectedDevice">
         </service>
 
         <activity
@@ -103,6 +111,12 @@
             android:exported="false"
             android:label="@string/bulk_read_cards_activity_name"
             android:parentActivityName=".card.ui.WalletActivity"/>
+
+        <activity
+            android:name=".device.ui.BluetoothDevicesActivity"
+            android:exported="false"
+            android:label="@string/bluetooth_devices_activity_name"
+            android:parentActivityName=".device.ui.DevicesActivity"/>
 
         <activity
             android:name=".device.ui.DevicesActivity"

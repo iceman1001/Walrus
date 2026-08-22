@@ -367,6 +367,35 @@
     <!-- Toast message shown when user tries open settings for a device that doesn't support any -->
     <string name="device_has_no_settings">Device has no settings</string>
 
+    <!-- Bluetooth -->
+    <string name="bluetooth_devices_activity_name">Bluetooth devices</string>
+    <string name="bluetooth_connect_device">Connect Bluetooth device</string>
+    <string name="bluetooth_paired_devices">Paired devices</string>
+    <string name="bluetooth_available_devices">Available devices</string>
+    <string name="bluetooth_scan">Scan</string>
+    <string name="bluetooth_stop_scan">Stop</string>
+    <string name="bluetooth_scanning">Scanning\u2026</string>
+    <string name="bluetooth_no_devices">No devices yet. Make sure the reader is powered on and
+        its Bluetooth module is switched on, then tap Scan.</string>
+    <string name="bluetooth_pair_hint">Pairing with %1$s. The Proxmark3 Blue Shark PIN is
+        1234.</string>
+    <string name="bluetooth_pairing">Pairing\u2026</string>
+    <string name="bluetooth_pair_failed">Pairing with %1$s failed</string>
+    <string name="bluetooth_connecting">Connecting to %1$s\u2026</string>
+    <string name="bluetooth_connect_failed">Could not open a Bluetooth connection to the
+        device</string>
+    <string name="bluetooth_device_not_recognised">That Bluetooth device is not a reader Walrus
+        knows how to talk to</string>
+    <string name="bluetooth_permission_missing">Walrus does not have permission to use
+        Bluetooth</string>
+    <string name="bluetooth_permission_rationale">Walrus needs Bluetooth access to find and
+        connect to your reader</string>
+    <string name="bluetooth_disabled">Bluetooth is turned off</string>
+    <string name="bluetooth_unsupported">This device has no Bluetooth adapter</string>
+    <string name="bluetooth_forget">Forget remembered device</string>
+    <string name="bluetooth_forgotten">Walrus will no longer reconnect automatically</string>
+    <string name="bluetooth_remembered">Reconnects automatically</string>
+
 
     <!--
         FixedElement
@@ -684,7 +713,7 @@
 
 
     <!--
-        UsbCardDevice
+        UsbSerialTransport
     -->
 
     <!-- Toast displayed when USB card device connection fails with an error -->
@@ -692,7 +721,7 @@
 
 
     <!--
-        UsbSerialCardDevice
+        UsbSerialTransport
     -->
 
     <!-- Toast displayed when serial USB card device opening fails with an error -->

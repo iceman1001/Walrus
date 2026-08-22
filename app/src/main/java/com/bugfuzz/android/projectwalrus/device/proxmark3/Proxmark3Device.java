@@ -19,6 +19,7 @@
 
 package com.bugfuzz.android.projectwalrus.device.proxmark3;
 
+import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.usb.UsbDevice;
@@ -40,12 +41,11 @@ import com.bugfuzz.android.projectwalrus.card.carddata.MifareReadStep;
 import com.bugfuzz.android.projectwalrus.card.carddata.ui.MifareReadSetupDialogFragment;
 import com.bugfuzz.android.projectwalrus.device.CardDevice;
 import com.bugfuzz.android.projectwalrus.device.ReadCardDataOperation;
-import com.bugfuzz.android.projectwalrus.device.UsbCardDevice;
-import com.bugfuzz.android.projectwalrus.device.UsbSerialCardDevice;
+import com.bugfuzz.android.projectwalrus.device.BluetoothSerialTransport;
+import com.bugfuzz.android.projectwalrus.device.SerialCardDevice;
+import com.bugfuzz.android.projectwalrus.device.UsbSerialTransport;
 import com.bugfuzz.android.projectwalrus.device.WriteOrEmulateCardDataOperation;
 import com.bugfuzz.android.projectwalrus.device.proxmark3.ui.Proxmark3Activity;
-import com.felhr.usbserial.UsbSerialDevice;
-import com.felhr.usbserial.UsbSerialInterface;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.parceler.Parcel;
@@ -77,15 +77,21 @@ import java.util.regex.Pattern;
         supportsWrite = {HIDCardData.class},
         supportsEmulate = {}
 )
-@UsbCardDevice.UsbIds({
-        @UsbCardDevice.UsbIds.Ids(vendorId = 0x2d2d, productId = 0x504d), // CDC Proxmark3
-        @UsbCardDevice.UsbIds.Ids(vendorId = 0x9ac4, productId = 0x4b8f), // HID Proxmark3
-        @UsbCardDevice.UsbIds.Ids(vendorId = 0x502d, productId = 0x502d)  // Proxmark3 Easy(?)
+@CardDevice.UsbIds({
+        @CardDevice.UsbIds.Ids(vendorId = 0x2d2d, productId = 0x504d), // CDC Proxmark3
+        @CardDevice.UsbIds.Ids(vendorId = 0x9ac4, productId = 0x4b8f), // HID Proxmark3
+        @CardDevice.UsbIds.Ids(vendorId = 0x502d, productId = 0x502d)  // Proxmark3 Easy(?)
 })
-public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3CommandNG>
+// The Blue Shark add-on ships advertising "PM3_RDV4.0"; the plain "PM3" prefix covers the
+// aftermarket HC-05/HC-06 modules people rename themselves.
+@CardDevice.BluetoothIds(namePrefixes = {"PM3", "Proxmark"})
+public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
         implements CardDevice.Versioned, MifareReadStep.BlockSource {
 
     private static final long DEFAULT_TIMEOUT = 20 * 1000;
+
+    /** Both the USB CDC port and the Blue Shark UART run at this rate. */
+    private static final int BAUD_RATE = 115200;
 
     /**
      * lf_hid_watch() in armsrc/lfops.c reports a decoded tag as a debug string, not in the reply
@@ -102,20 +108,18 @@ public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3CommandNG>
 
     @Keep
     public Proxmark3Device(Context context, UsbDevice usbDevice) throws IOException {
-        super(context, usbDevice, context.getString(R.string.idle));
-
-        send(Proxmark3CommandNG.ng(Proxmark3CommandNG.VERSION));
+        this(context, new UsbSerialTransport(context, usbDevice, BAUD_RATE));
     }
 
-    @Override
-    protected void setupSerialParams(UsbSerialDevice usbSerialDevice) {
-        usbSerialDevice.setBaudRate(115200);
+    @Keep
+    public Proxmark3Device(Context context, BluetoothDevice bluetoothDevice) throws IOException {
+        this(context, new BluetoothSerialTransport(context, bluetoothDevice));
+    }
 
-        usbSerialDevice.setDataBits(UsbSerialInterface.DATA_BITS_8);
-        usbSerialDevice.setParity(UsbSerialInterface.PARITY_NONE);
-        usbSerialDevice.setStopBits(UsbSerialInterface.STOP_BITS_1);
+    private Proxmark3Device(Context context, Transport transport) throws IOException {
+        super(context, transport, context.getString(R.string.idle));
 
-        usbSerialDevice.setFlowControl(UsbSerialInterface.FLOW_CONTROL_OFF);
+        send(Proxmark3CommandNG.ng(Proxmark3CommandNG.VERSION));
     }
 
     @Override

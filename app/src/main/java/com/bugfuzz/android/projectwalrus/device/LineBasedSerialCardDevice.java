@@ -20,21 +20,20 @@
 package com.bugfuzz.android.projectwalrus.device;
 
 import android.content.Context;
-import android.hardware.usb.UsbDevice;
 import android.util.Pair;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
-public abstract class LineBasedUsbSerialCardDevice extends UsbSerialCardDevice<String> {
+public abstract class LineBasedSerialCardDevice extends SerialCardDevice<String> {
 
     private final String delimiter;
     private final String charsetName;
     private boolean bytewise = false;
 
-    protected LineBasedUsbSerialCardDevice(Context context, UsbDevice usbDevice, String delimiter,
+    protected LineBasedSerialCardDevice(Context context, Transport transport, String delimiter,
             String charsetName, String status) throws IOException {
-        super(context, usbDevice, status);
+        super(context, transport, status);
 
         this.delimiter = delimiter;
         this.charsetName = charsetName;

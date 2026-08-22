@@ -126,4 +126,38 @@ public abstract class CardDevice {
 
         Class<? extends CardData>[] supportsEmulate();
     }
+
+    /**
+     * The USB vendor/product pairs a device class answers to. Moved here from UsbCardDevice when
+     * the transport was split out, so that one device class can be reachable over more than one
+     * kind of connection.
+     */
+    @Target(ElementType.TYPE)
+    @Retention(RetentionPolicy.RUNTIME)
+    public @interface UsbIds {
+        Ids[] value();
+
+        @Target({})
+        @Retention(RetentionPolicy.RUNTIME)
+        @interface Ids {
+            int vendorId();
+
+            int productId();
+        }
+    }
+
+    /**
+     * Bluetooth has no equivalent of a USB vendor/product id, so devices are matched on the name
+     * their module advertises. The Proxmark3 Blue Shark ships as "PM3_RDV4.0"; see section 6.1 of
+     * doc/bt_manual_v10.md in the Iceman fork.
+     *
+     * <p>A class carrying this annotation must also offer a
+     * {@code (Context, android.bluetooth.BluetoothDevice)} constructor.
+     */
+    @Target(ElementType.TYPE)
+    @Retention(RetentionPolicy.RUNTIME)
+    public @interface BluetoothIds {
+        /** Matched case-insensitively against the start of the remote device's name. */
+        String[] namePrefixes();
+    }
 }

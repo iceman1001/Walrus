@@ -37,7 +37,6 @@ import android.widget.Toast;
 import com.bugfuzz.android.projectwalrus.card.carddata.HIDCardData;
 import com.bugfuzz.android.projectwalrus.device.CardDevice;
 import com.bugfuzz.android.projectwalrus.device.CardDeviceManager;
-import com.bugfuzz.android.projectwalrus.device.UsbCardDevice;
 import com.bugfuzz.android.projectwalrus.util.GeoUtils;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -146,7 +145,7 @@ public class WalrusApplication extends Application {
                 }
 
                 toast = getString(R.string.device_connected,
-                        cardDevice.getClass().getAnnotation(UsbCardDevice.Metadata.class).name());
+                        cardDevice.getClass().getAnnotation(CardDevice.Metadata.class).name());
 
                 timings = new long[]{200, 200, 200, 200, 200};
                 amplitudes = new int[]{255, 0, 255, 0, 255};

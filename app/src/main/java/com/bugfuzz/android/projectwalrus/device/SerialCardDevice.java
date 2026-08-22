@@ -20,13 +20,9 @@
 package com.bugfuzz.android.projectwalrus.device;
 
 import android.content.Context;
-import android.hardware.usb.UsbDevice;
 import android.util.Pair;
 
-import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.util.MiscUtils;
-import com.felhr.usbserial.UsbSerialDevice;
-import com.felhr.usbserial.UsbSerialInterface;
 
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -36,60 +32,83 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-public abstract class UsbSerialCardDevice<T> extends UsbCardDevice {
+/**
+ * A card device that talks a byte-stream protocol, with the framing kept separate from the pipe
+ * the bytes travel over.
+ *
+ * <p>This used to be {@code UsbSerialCardDevice} with the USB serial port built in. It was split
+ * apart so that the same device implementation can be reached over USB or over a Bluetooth
+ * RFCOMM socket: the Proxmark3's Blue Shark add-on hangs off the same UART the firmware already
+ * speaks its protocol on, so nothing above {@link Transport} needs to know which one is in use.
+ */
+public abstract class SerialCardDevice<T> extends CardDevice {
 
     private final BlockingQueue<T> receiveQueue = new LinkedBlockingQueue<>();
-    private UsbSerialDevice usbSerialDevice;
+
+    private final Transport transport;
+
     private volatile boolean receiving;
     private byte[] buffer = new byte[0];
 
-    protected UsbSerialCardDevice(Context context, UsbDevice usbDevice, String status)
+    protected SerialCardDevice(Context context, Transport transport, String status)
             throws IOException {
-        super(context, usbDevice, status);
+        super(context, status);
 
-        usbSerialDevice = UsbSerialDevice.createUsbSerialDevice(usbDevice, usbDeviceConnection);
-        if (!usbSerialDevice.open()) {
-            throw new IOException(context.getString(R.string.failed_open_usb_serial_device));
-        }
+        this.transport = transport;
 
-        setupSerialParams(usbSerialDevice);
-
-        usbSerialDevice.read(new UsbSerialInterface.UsbReadCallback() {
+        transport.open(new Transport.Listener() {
             @Override
-            public void onReceivedData(byte[] in) {
-                buffer = ArrayUtils.addAll(buffer, in);
+            public void onBytesReceived(byte[] in) {
+                SerialCardDevice.this.onBytesReceived(in);
+            }
 
-                for (; ; ) {
-                    Pair<T, Integer> sliced = sliceIncoming(buffer);
-                    if (sliced == null) {
-                        break;
-                    }
-
-                    Logger.getAnonymousLogger().info("<<< sliced: " + sliced.first + " - " + MiscUtils.bytesToHex(buffer, false));
-
-
-                    buffer = ArrayUtils.subarray(buffer, sliced.second, buffer.length);
-
-                    if (receiving) {
-                        // CHECKSTYLE:OFF EmptyCatchBlock
-                        try {
-                            receiveQueue.put(sliced.first);
-                        } catch (InterruptedException ignored) {
-                        }
-                        // CHECKSTYLE:ON EmptyCatchBlock
-                    }
-                }
+            @Override
+            public void onTransportClosed(IOException reason) {
+                SerialCardDevice.this.onTransportClosed(reason);
             }
         });
     }
 
-    protected void setupSerialParams(UsbSerialDevice usbSerialDevice) {
+    public Transport getTransport() {
+        return transport;
+    }
+
+    private void onBytesReceived(byte[] in) {
+        buffer = ArrayUtils.addAll(buffer, in);
+
+        for (; ; ) {
+            Pair<T, Integer> sliced = sliceIncoming(buffer);
+            if (sliced == null) {
+                break;
+            }
+
+            Logger.getAnonymousLogger().info("<<< sliced: " + sliced.first + " - "
+                    + MiscUtils.bytesToHex(buffer, false));
+
+            buffer = ArrayUtils.subarray(buffer, sliced.second, buffer.length);
+
+            if (receiving) {
+                // CHECKSTYLE:OFF EmptyCatchBlock
+                try {
+                    receiveQueue.put(sliced.first);
+                } catch (InterruptedException ignored) {
+                }
+                // CHECKSTYLE:ON EmptyCatchBlock
+            }
+        }
+    }
+
+    /**
+     * Called when the pipe drops of its own accord, which a Bluetooth link does whenever the
+     * device goes out of range or is switched off. USB has its own detach broadcast instead.
+     */
+    protected void onTransportClosed(IOException reason) {
+        CardDeviceManager.INSTANCE.onDeviceDisconnected(context, this);
     }
 
     @Override
     public void close() {
-        usbSerialDevice.close();
-        usbSerialDevice = null;
+        transport.close();
 
         super.close();
     }
@@ -146,8 +165,31 @@ public abstract class UsbSerialCardDevice<T> extends UsbCardDevice {
             throw new RuntimeException("Failed to format outgoing");
         }
 
-        Logger.getAnonymousLogger().info(">>> wrote: " + new String(bytes) + " - " + MiscUtils.bytesToHex(bytes, false));
-        usbSerialDevice.write(bytes);
+        Logger.getAnonymousLogger().info(">>> wrote: " + new String(bytes) + " - "
+                + MiscUtils.bytesToHex(bytes, false));
+        transport.write(bytes);
+    }
+
+    /**
+     * The byte pipe underneath a {@link SerialCardDevice}. Implementations are expected to be
+     * usable from any thread and to deliver reads on a thread of their own choosing.
+     */
+    public interface Transport {
+
+        void open(Listener listener) throws IOException;
+
+        void write(byte[] bytes);
+
+        void close();
+
+        /** Something the user can be shown to identify the connection, e.g. a MAC address. */
+        String getDescription();
+
+        interface Listener {
+            void onBytesReceived(byte[] in);
+
+            void onTransportClosed(IOException reason);
+        }
     }
 
     protected abstract static class ReceiveSink<T, O> {
