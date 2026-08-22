@@ -33,7 +33,6 @@ import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.device.CardDevice;
 import com.bugfuzz.android.projectwalrus.device.CardDeviceManager;
 import com.bugfuzz.android.projectwalrus.device.proxmark3.Proxmark3Device;
-import com.bugfuzz.android.projectwalrus.device.proxmark3.Proxmark3DeviceIceman;
 import com.bugfuzz.android.projectwalrus.device.ui.FindVersionFragment;
 import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
@@ -49,15 +48,8 @@ public class Proxmark3Activity extends AppCompatActivity
     private static final String PROXMARK3_TUNE_DIALOG_FRAGMENT_TAG = "proxmark3_tune_dialog";
 
     private Proxmark3Device proxmark3Device;
-    private Proxmark3DeviceIceman proxmark3DeviceIceman;
 
     public static Intent getStartActivityIntent(Context context, Proxmark3Device device) {
-        Intent intent = new Intent(context, Proxmark3Activity.class);
-        intent.putExtra(EXTRA_DEVICE, device.getId());
-        return intent;
-    }
-
-    public static Intent getStartActivityIntent(Context context, Proxmark3DeviceIceman device) {
         Intent intent = new Intent(context, Proxmark3Activity.class);
         intent.putExtra(EXTRA_DEVICE, device.getId());
         return intent;

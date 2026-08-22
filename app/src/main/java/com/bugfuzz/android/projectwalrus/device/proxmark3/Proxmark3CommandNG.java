@@ -19,10 +19,7 @@
 
 package com.bugfuzz.android.projectwalrus.device.proxmark3;
 
-import androidx.annotation.LongDef;
-import androidx.annotation.Size;
-
-import org.apache.commons.lang3.ArrayUtils;
+import androidx.annotation.IntDef;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -32,129 +29,251 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
+/**
+ * One Proxmark3 "NG" frame, in either direction.
+ *
+ * <p>Wire format, all little endian, from {@code include/pm3_cmd.h}:
+ *
+ * <pre>
+ * command (host -&gt; device), 8 + length + 2 bytes:
+ *     uint32 magic         COMMANDNG_PREAMBLE_MAGIC ("PM3a")
+ *     uint16 length:15     length of the payload
+ *            ng:1          payload is a bare NG payload, not a MIX one
+ *     uint16 cmd
+ *     uint8  payload[length]
+ *     uint16 crc           COMMANDNG_POSTAMBLE_MAGIC ("a3") is accepted in place of a CRC
+ *
+ * response (device -&gt; host), 10 + length + 2 bytes:
+ *     uint32 magic         RESPONSENG_PREAMBLE_MAGIC ("PM3b")
+ *     uint16 length:15
+ *            ng:1
+ *     int8   status        PM3_SUCCESS or a negative PM3_E* code
+ *     int8   reason
+ *     uint16 cmd
+ *     uint8  payload[length]
+ *     uint16 crc           RESPONSENG_POSTAMBLE_MAGIC ("b3") when CRCs are off, which is the
+ *                          default over USB
+ * </pre>
+ *
+ * <p>A frame is either "NG" ({@code ng} set), where the payload is exactly the command's own
+ * struct, or "MIX" ({@code ng} clear), where the payload is three uint64 legacy args followed by
+ * the data. MIX is how the firmware's {@code reply_mix()} and the old {@code arg0..arg2} calling
+ * convention survive inside NG framing; several opcodes still use it.
+ *
+ * <p>Note that the firmware still <em>accepts</em> legacy 544-byte {@code PacketCommandOLD}
+ * commands, but {@code reply_ng_internal()} in {@code armsrc/cmd.c} is the only thing that ever
+ * sends a response, and it always emits NG framing. There is therefore no point in speaking the
+ * legacy format: nothing can be read back.
+ */
 class Proxmark3CommandNG {
 
-    static final short ACK = 0xff;
-    static final short DEBUG_PRINT_STRING = 0x100;
-    static final short VERSION = 0x107;
-    static final short CAPABILITIES = 0x0112;
+    static final int PM3_CMD_DATA_SIZE = 512;
 
-    static final short HID_DEMOD_FSK = 0x20b; // CMD_LF_HID_WATCH
-    static final short HID_CLONE_TAG = 0x210;
-    static final short READER_ISO_14443A = 0x385;
+    static final int COMMANDNG_PREAMBLE_MAGIC = 0x61334d50;  // PM3a
+    static final short COMMANDNG_POSTAMBLE_MAGIC = 0x3361;   // a3
+    static final int RESPONSENG_PREAMBLE_MAGIC = 0x62334d50; // PM3b
 
-    static final short MEASURE_ANTENNA_TUNING = 0x400;
-    static final short MEASURED_ANTENNA_TUNING = 0x410;
+    static final int COMMAND_PREAMBLE_SIZE = 8;
+    static final int RESPONSE_PREAMBLE_SIZE = 10;
+    static final int POSTAMBLE_SIZE = 2;
 
-    static final short CMD_MEASURE_ANTENNA_TUNING = 0x0400;
-    static final short CMD_MEASURE_ANTENNA_TUNING_HF = 0x0401;
-    static final short CMD_MEASURE_ANTENNA_TUNING_LF = 0x0402;
+    static final int MIX_ARGS_SIZE = 3 * 8;
 
-    static final short MIFARE_READBL = 0x620;
+    // Opcodes, from include/pm3_cmd.h.
+    static final int NACK = 0x00fe;
+    static final int ACK = 0x00ff;
+    static final int DEBUG_PRINT_STRING = 0x0100;
+    static final int VERSION = 0x0107;
+    static final int PING = 0x0109;
+    static final int CAPABILITIES = 0x0112;
+    static final int LF_HID_WATCH = 0x020b;
+    static final int LF_HID_CLONE = 0x0210;
+    static final int HF_ISO14443A_READER = 0x0385;
+    static final int MEASURE_ANTENNA_TUNING = 0x0400;
+    static final int HF_MIFARE_READBL = 0x0620;
+    static final int UNKNOWN = 0xffff;
 
-    static final short MEASURE_ANTENNA_TUNING_FLAG_TUNE_LF = 1;
-    static final short MEASURE_ANTENNA_TUNING_FLAG_TUNE_HF = 2;
+    // Flags for HF_ISO14443A_READER's first MIX arg (iso14a_command_t).
+    static final long ISO14A_CONNECT = 1 << 0;
 
-    static final short ISO14A_CONNECT = 1 << 0;
+    // Status codes, from include/pm3_cmd.h.
+    static final byte PM3_SUCCESS = 0;
+    static final byte PM3_EOPABORTED = -5;
 
-    static final long COMMANDNG_PREAMBLE_MAGIC = 0x61334d50; // PM3a
-    static final short COMMANDNG_POSTAMBLE_MAGIC = 0x3361;     // a3
-
-    // Success (no error)
-    static final long PM3_SUCCESS = 0;
-
-    // params
-    short cmd = 0;
-    short length = 0;
-    long magic = 0;
-    short crc = 0;
+    /**
+     * Not annotated with {@link Opcode}: a parsed response can carry any opcode the firmware
+     * chooses to send, including ones this app has no constant for.
+     */
+    final int cmd;
+    final boolean ng;
+    final byte status;
+    final byte reason;
+    /** Only meaningful when {@link #ng} is false. */
     final long[] oldargs;
+    /** The payload, with the MIX args already stripped when {@link #ng} is false. */
     final byte[] data;
-    boolean ng = true;
 
-    Proxmark3CommandNG(
-                short cmd,
-                short length,
-                @Size(3) long[] oldargs,
-                @Size(max = 512) byte[] data,
-                boolean ng
-                    ) {
-        this.cmd = cmd;
-        this.length = length;
-        this.magic = COMMANDNG_PREAMBLE_MAGIC;
-        this.crc = COMMANDNG_POSTAMBLE_MAGIC;
-        this.ng = ng;
-
+    private Proxmark3CommandNG(int cmd, boolean ng, byte status, byte reason,
+            long[] oldargs, byte[] data) {
+        if (data.length > PM3_CMD_DATA_SIZE) {
+            throw new IllegalArgumentException("Data too long");
+        }
         if (oldargs.length != 3) {
             throw new IllegalArgumentException("Invalid number of args");
         }
+
+        this.cmd = cmd;
+        this.ng = ng;
+        this.status = status;
+        this.reason = reason;
         this.oldargs = oldargs;
+        this.data = data;
+    }
 
-        if (data.length > 512) {
-            throw new IllegalArgumentException("Data too long");
+    /** A bare NG command: the payload is the opcode's own struct. */
+    static Proxmark3CommandNG ng(@Opcode int cmd, byte[] data) {
+        return new Proxmark3CommandNG(cmd, true, PM3_SUCCESS, (byte) 0, new long[3], data);
+    }
+
+    /** A bare NG command with no payload. */
+    static Proxmark3CommandNG ng(@Opcode int cmd) {
+        return ng(cmd, new byte[0]);
+    }
+
+    /** A MIX command: three legacy uint64 args, then the data. */
+    static Proxmark3CommandNG mix(@Opcode int cmd, long[] oldargs, byte[] data) {
+        return new Proxmark3CommandNG(cmd, false, PM3_SUCCESS, (byte) 0, oldargs, data);
+    }
+
+    /**
+     * Parses one response frame starting at the beginning of {@code in}, or returns null if
+     * {@code in} does not hold a whole frame yet. The caller has already checked the magic.
+     */
+    static Proxmark3CommandNG responseFromBytes(byte[] in) {
+        if (in.length < RESPONSE_PREAMBLE_SIZE) {
+            return null;
         }
-        this.data = Arrays.copyOf(data, 512);
-    }
 
-    Proxmark3CommandNG(
-            short cmd,
-            short length,
-            @Size(3) long[] oldargs,
-            boolean ng) {
-        this(cmd, length, oldargs, new byte[0], ng);
-    }
-
-    Proxmark3CommandNG(short cmd) {
-        this(cmd,(short)0, new long[3], true);
-    }
-
-    static int getByteLength() {
-        return 8 + 3 * 8 + 512;
-    }
-
-    static Proxmark3CommandNG fromBytes(byte[] bytes) {
-        ByteBuffer bb = ByteBuffer.wrap(bytes);
+        ByteBuffer bb = ByteBuffer.wrap(in);
         bb.order(ByteOrder.LITTLE_ENDIAN);
 
-        short cmd = bb.getShort();
+        bb.getInt(); // magic, already checked by the caller
 
-        long[] args = new long[3];
-        for (int i = 0; i < 3; ++i) {
-            args[i] = bb.getLong();
+        int lengthAndNg = bb.getShort() & 0xffff;
+        int length = lengthAndNg & 0x7fff;
+        boolean ng = (lengthAndNg & 0x8000) != 0;
+
+        byte status = bb.get();
+        byte reason = bb.get();
+        int cmd = bb.getShort() & 0xffff;
+
+        if (length > PM3_CMD_DATA_SIZE
+                || in.length < RESPONSE_PREAMBLE_SIZE + length + POSTAMBLE_SIZE) {
+            return null;
         }
 
-        byte[] data = new byte[512];
-        bb.get(data);
+        long[] oldargs = new long[3];
+        byte[] data;
 
-        return new Proxmark3CommandNG(cmd, (short)0, args, data, true);
+        if (ng) {
+            data = new byte[length];
+            bb.get(data);
+        } else {
+            if (length < MIX_ARGS_SIZE) {
+                return null;
+            }
+
+            for (int i = 0; i < 3; ++i) {
+                oldargs[i] = bb.getLong();
+            }
+
+            data = new byte[length - MIX_ARGS_SIZE];
+            bb.get(data);
+        }
+
+        return new Proxmark3CommandNG(cmd, ng, status, reason, oldargs, data);
+    }
+
+    /** The on-the-wire size of the response frame that {@code responseFromBytes} just parsed. */
+    int getResponseByteLength() {
+        return RESPONSE_PREAMBLE_SIZE + (ng ? data.length : MIX_ARGS_SIZE + data.length)
+                + POSTAMBLE_SIZE;
+    }
+
+    /** A placeholder handed to the receive sinks when the stream had to be resynchronised. */
+    static Proxmark3CommandNG unknown() {
+        return new Proxmark3CommandNG(UNKNOWN, true, PM3_SUCCESS, (byte) 0, new long[3],
+                new byte[0]);
     }
 
     byte[] toBytes() {
-        ByteBuffer bb = ByteBuffer.allocate(getByteLength());
-        bb.order(ByteOrder.LITTLE_ENDIAN);
-
-        bb.putShort(cmd);
-
-        for (long arg : oldargs) {
-            bb.putLong(arg);
+        byte[] payload;
+        if (ng) {
+            payload = data;
+        } else {
+            ByteBuffer args = ByteBuffer.allocate(MIX_ARGS_SIZE + data.length);
+            args.order(ByteOrder.LITTLE_ENDIAN);
+            for (long arg : oldargs) {
+                args.putLong(arg);
+            }
+            args.put(data);
+            payload = args.array();
         }
 
-        bb.put(data);
+        ByteBuffer bb = ByteBuffer.allocate(
+                COMMAND_PREAMBLE_SIZE + payload.length + POSTAMBLE_SIZE);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
 
-        byte[] bytes = new byte[bb.capacity()];
-        bb.flip();
-        bb.get(bytes);
+        bb.putInt(COMMANDNG_PREAMBLE_MAGIC);
+        bb.putShort((short) ((payload.length & 0x7fff) | (ng ? 0x8000 : 0)));
+        bb.putShort((short) cmd);
+        bb.put(payload);
+        // The firmware accepts the postamble magic in place of a real CRC, and CRCs are off over
+        // USB by default (see receive_ng_internal() in armsrc/cmd.c).
+        bb.putShort(COMMANDNG_POSTAMBLE_MAGIC);
 
-        return bytes;
+        return bb.array();
+    }
+
+    /**
+     * The payload of a {@link #DEBUG_PRINT_STRING} response, which is a uint16 flag field
+     * followed by the message, with the firmware's ANSI colour escapes stripped out.
+     */
+    String debugString() {
+        if (data.length < 2) {
+            return "";
+        }
+
+        return stripAnsi(new String(Arrays.copyOfRange(data, 2, data.length)).trim());
+    }
+
+    private static String stripAnsi(String string) {
+        return string.replaceAll("\u001B\\[[0-9;]*m", "");
     }
 
     @Override
     public String toString() {
-        return "<Proxmark3Command " + cmd + ", args " + Arrays.toString(oldargs) + ", data "
-                + Arrays.toString(data) + ">";
+        return "<Proxmark3CommandNG cmd 0x" + Integer.toHexString(cmd) + ", "
+                + (ng ? "NG" : "MIX, args " + Arrays.toString(oldargs))
+                + ", status " + status + ", " + data.length + " bytes of data>";
     }
 
-    public String dataAsString() {
-        return new String(ArrayUtils.subarray(data, 0, (int) oldargs[0]));
+    @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.LOCAL_VARIABLE})
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({
+            NACK,
+            ACK,
+            DEBUG_PRINT_STRING,
+            VERSION,
+            PING,
+            CAPABILITIES,
+            LF_HID_WATCH,
+            LF_HID_CLONE,
+            HF_ISO14443A_READER,
+            MEASURE_ANTENNA_TUNING,
+            HF_MIFARE_READBL,
+            UNKNOWN
+    })
+    public @interface Opcode {
     }
 }
