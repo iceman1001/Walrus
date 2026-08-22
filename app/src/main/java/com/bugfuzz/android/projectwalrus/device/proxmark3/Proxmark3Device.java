@@ -91,6 +91,9 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
 
     private static final long DEFAULT_TIMEOUT = 20 * 1000;
 
+    /** The client allows 1s per live sample; be a little more forgiving over BT. */
+    private static final long LIVE_TUNE_TIMEOUT = 3 * 1000;
+
     /** Both the USB CDC port and the Blue Shark UART run at this rate. */
     private static final int BAUD_RATE = 115200;
 
@@ -369,6 +372,92 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
         } finally {
             releaseAndSetStatus();
         }
+    }
+
+    /**
+     * The continuous measurement behind the client's {@code lf tune} and {@code hf tune}, which
+     * is a different thing from {@code hw tune}: rather than sweeping the LF band once, the
+     * firmware parks the field at one frequency and hands back a fresh reading each time it is
+     * asked, until told to stop.
+     *
+     * <p>Protocol, from client/src/cmdlf.c and cmdhf.c: send mode 1 to start, mode 2 repeatedly
+     * to sample, mode 3 to shut the field down. LF carries {mode, divisor} and the firmware
+     * rejects anything that is not exactly two bytes; HF carries {mode} and insists on one. A
+     * reply with status PM3_EOPABORTED means the button on the Proxmark3 was pressed.
+     *
+     * <p>Blocks until the sink stops wanting more, so call it off the main thread.
+     */
+    public void liveTune(boolean lf, LiveTuneSink sink) throws IOException {
+        if (!tryAcquireAndSetStatus(context.getString(R.string.tuning))) {
+            throw new IOException(context.getString(R.string.device_busy));
+        }
+
+        try {
+            int op = lf ? Proxmark3CommandNG.MEASURE_ANTENNA_TUNING_LF
+                    : Proxmark3CommandNG.MEASURE_ANTENNA_TUNING_HF;
+
+            if (sendThenReceiveCommands(
+                    Proxmark3CommandNG.ng(op, tuneModePayload(lf,
+                            Proxmark3CommandNG.TUNE_MODE_START)),
+                    new CommandWaiter(op, DEFAULT_TIMEOUT)) == null) {
+                throw new IOException(context.getString(R.string.tune_timeout));
+            }
+
+            try {
+                byte[] read = tuneModePayload(lf, Proxmark3CommandNG.TUNE_MODE_READ);
+
+                while (sink.wantsMore()) {
+                    Proxmark3CommandNG result = sendThenReceiveCommands(
+                            Proxmark3CommandNG.ng(op, read),
+                            new CommandWaiter(op, LIVE_TUNE_TIMEOUT));
+                    if (result == null) {
+                        throw new IOException(context.getString(R.string.tune_timeout));
+                    }
+
+                    if (result.status == Proxmark3CommandNG.PM3_EOPABORTED) {
+                        // The button on the device was pressed.
+                        break;
+                    }
+
+                    // HF answers with a uint16 on older firmware and a uint32 on current, which
+                    // can exceed 65.535V; the client accepts either.
+                    ByteBuffer bb = ByteBuffer.wrap(result.data);
+                    bb.order(ByteOrder.LITTLE_ENDIAN);
+
+                    if (result.data.length == 4) {
+                        sink.onVoltage(bb.getInt() & 0xffffffffL);
+                    } else if (result.data.length == 2) {
+                        sink.onVoltage(bb.getShort() & 0xffffL);
+                    } else {
+                        break;
+                    }
+                }
+            } finally {
+                sendThenReceiveCommands(
+                        Proxmark3CommandNG.ng(op, tuneModePayload(lf,
+                                Proxmark3CommandNG.TUNE_MODE_STOP)),
+                        new CommandWaiter(op, DEFAULT_TIMEOUT));
+            }
+        } finally {
+            releaseAndSetStatus();
+        }
+    }
+
+    private static byte[] tuneModePayload(boolean lf, int mode) {
+        return lf
+                ? new byte[]{(byte) mode, (byte) Proxmark3CommandNG.LF_DIVISOR_125}
+                : new byte[]{(byte) mode};
+    }
+
+    /** The frequency the live LF measurement parks at, in Hz. */
+    public static float getLiveTuneLfFrequency() {
+        return 12e6f / (Proxmark3CommandNG.LF_DIVISOR_125 + 1);
+    }
+
+    public interface LiveTuneSink {
+        boolean wantsMore();
+
+        void onVoltage(long millivolts);
     }
 
     private static class ReadHIDOperation extends ReadCardDataOperation {

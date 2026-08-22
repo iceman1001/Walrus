@@ -367,6 +367,18 @@
     <!-- Toast message shown when user tries open settings for a device that doesn't support any -->
     <string name="device_has_no_settings">Device has no settings</string>
 
+    <!-- Proxmark3 antenna tuning -->
+    <string name="tune_sweep">Sweep LF band</string>
+    <string name="live_tune_activity_name">Antenna</string>
+    <string name="live_tune_lf">LF antenna at %1$.2f kHz</string>
+    <string name="live_tune_hf">HF antenna at 13.56 MHz</string>
+    <string name="live_tune_voltage">%1$.3f V</string>
+    <string name="live_tune_peak">Peak %1$.3f V</string>
+    <string name="live_tune_measuring">Measuring. Press back, or the button on the Proxmark3,
+        to stop.</string>
+    <string name="live_tune_stopped">Stopped</string>
+    <string name="live_tune_button_pressed">Stopped from the Proxmark3 button</string>
+
     <!-- Bluetooth -->
     <string name="bluetooth_devices_activity_name">Bluetooth devices</string>
     <string name="bluetooth_connect_device">Connect Bluetooth device</string>

@@ -94,6 +94,17 @@ class Proxmark3CommandNG {
     static final int LF_HID_CLONE = 0x0210;
     static final int HF_ISO14443A_READER = 0x0385;
     static final int MEASURE_ANTENNA_TUNING = 0x0400;
+    /** Continuous HF measurement: payload is one mode byte, 1 start / 2 read / 3 stop. */
+    static final int MEASURE_ANTENNA_TUNING_HF = 0x0401;
+    /** Continuous LF measurement: payload is {mode, divisor}; the divisor sets the frequency. */
+    static final int MEASURE_ANTENNA_TUNING_LF = 0x0402;
+
+    static final int TUNE_MODE_START = 1;
+    static final int TUNE_MODE_READ = 2;
+    static final int TUNE_MODE_STOP = 3;
+
+    /** LF_FREQ2DIV(125) from pm3_cmd.h; LF_DIV2FREQ(d) is 12000 / (d + 1) kHz. */
+    static final int LF_DIVISOR_125 = 95;
     static final int HF_MIFARE_READBL = 0x0620;
     static final int UNKNOWN = 0xffff;
 
@@ -273,6 +284,8 @@ class Proxmark3CommandNG {
             LF_HID_CLONE,
             HF_ISO14443A_READER,
             MEASURE_ANTENNA_TUNING,
+            MEASURE_ANTENNA_TUNING_HF,
+            MEASURE_ANTENNA_TUNING_LF,
             HF_MIFARE_READBL,
             UNKNOWN
     })

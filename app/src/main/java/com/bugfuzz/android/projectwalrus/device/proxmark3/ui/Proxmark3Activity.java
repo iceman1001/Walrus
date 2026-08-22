@@ -94,12 +94,23 @@ public class Proxmark3Activity extends AppCompatActivity
                 exception.getMessage()));
     }
 
+    /**
+     * The two band buttons run the continuous measurement, which is what the client's
+     * {@code lf tune} and {@code hf tune} do. The sweep that draws a resonance curve is
+     * {@code hw tune}, and lives behind its own button.
+     */
     public void onTuneLFClick(View view) {
-        tune(true);
+        startActivity(Proxmark3LiveTuneActivity.getStartActivityIntent(this, proxmark3Device,
+                true));
     }
 
     public void onTuneHFClick(View view) {
-        tune(false);
+        startActivity(Proxmark3LiveTuneActivity.getStartActivityIntent(this, proxmark3Device,
+                false));
+    }
+
+    public void onSweepClick(View view) {
+        tune(true);
     }
 
     private void tune(boolean lf) {

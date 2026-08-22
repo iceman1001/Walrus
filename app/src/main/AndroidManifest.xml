@@ -131,6 +131,12 @@
             android:parentActivityName=".device.ui.DevicesActivity"/>
 
         <activity
+            android:name=".device.proxmark3.ui.Proxmark3LiveTuneActivity"
+            android:exported="false"
+            android:label="@string/live_tune_activity_name"
+            android:parentActivityName=".device.proxmark3.ui.Proxmark3Activity"/>
+
+        <activity
             android:name=".device.proxmark3.ui.Proxmark3TuneResultActivity"
             android:exported="false"
             android:label="@string/proxmark3_tune_result_activity_name"
