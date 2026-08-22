@@ -46,6 +46,7 @@ import com.bugfuzz.android.projectwalrus.device.SerialCardDevice;
 import com.bugfuzz.android.projectwalrus.device.UsbSerialTransport;
 import com.bugfuzz.android.projectwalrus.device.WriteOrEmulateCardDataOperation;
 import com.bugfuzz.android.projectwalrus.device.proxmark3.ui.Proxmark3Activity;
+import com.bugfuzz.android.projectwalrus.util.MiscUtils;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.parceler.Parcel;
@@ -304,7 +305,8 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
             versionStringLength = Math.max(0,
                     Math.min(versionStringLength - 1, version.data.length - 12));
 
-            return new String(ArrayUtils.subarray(version.data, 12, 12 + versionStringLength));
+            return MiscUtils.stripAnsi(new String(
+                    ArrayUtils.subarray(version.data, 12, 12 + versionStringLength)));
         } finally {
             releaseAndSetStatus();
         }
@@ -477,6 +479,11 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
                         new WatchdogReceiveSink<Proxmark3CommandNG, Boolean>(DEFAULT_TIMEOUT) {
                             @Override
                             public Boolean onReceived(Proxmark3CommandNG in) {
+                                if (in.cmd == Proxmark3CommandNG.WTX) {
+                                    resetWatchdog();
+                                    return null;
+                                }
+
                                 // CopyHIDtoT55x7() finishes with reply_ng(CMD_LF_HID_CLONE, ...);
                                 // it no longer prints "DONE!".
                                 return in.cmd == Proxmark3CommandNG.LF_HID_CLONE
@@ -597,6 +604,14 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
 
         @Override
         public Proxmark3CommandNG onReceived(Proxmark3CommandNG in) {
+            // A slow operation asks for more time rather than going quiet: an antenna tune sends
+            // two of these before its result. The real client adds the requested milliseconds to
+            // its timeout (client/src/comms.c); restarting the watchdog has the same effect.
+            if (in.cmd == Proxmark3CommandNG.WTX) {
+                resetWatchdog();
+                return null;
+            }
+
             return in.cmd == cmd ? in : null;
         }
     }

@@ -21,6 +21,8 @@ package com.bugfuzz.android.projectwalrus.device.proxmark3;
 
 import androidx.annotation.IntDef;
 
+import com.bugfuzz.android.projectwalrus.util.MiscUtils;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -86,6 +88,8 @@ class Proxmark3CommandNG {
     static final int VERSION = 0x0107;
     static final int PING = 0x0109;
     static final int CAPABILITIES = 0x0112;
+    /** Waiting Time eXtension: the firmware asking the host to keep waiting. */
+    static final int WTX = 0x0116;
     static final int LF_HID_WATCH = 0x020b;
     static final int LF_HID_CLONE = 0x0210;
     static final int HF_ISO14443A_READER = 0x0385;
@@ -244,11 +248,8 @@ class Proxmark3CommandNG {
             return "";
         }
 
-        return stripAnsi(new String(Arrays.copyOfRange(data, 2, data.length)).trim());
-    }
-
-    private static String stripAnsi(String string) {
-        return string.replaceAll("\u001B\\[[0-9;]*m", "");
+        return MiscUtils.stripAnsi(
+                new String(Arrays.copyOfRange(data, 2, data.length)).trim());
     }
 
     @Override
@@ -267,6 +268,7 @@ class Proxmark3CommandNG {
             VERSION,
             PING,
             CAPABILITIES,
+            WTX,
             LF_HID_WATCH,
             LF_HID_CLONE,
             HF_ISO14443A_READER,

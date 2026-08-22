@@ -41,6 +41,19 @@ public class MiscUtils {
         return result.toString();
     }
 
+    /**
+     * Strips ANSI escape sequences from text that came off a device.
+     *
+     * <p>Proxmark3 firmware colours its output - include/ansi.h wraps values in ANSI_GREEN and
+     * friends - and both the version string and the debug lines that carry decoded tags arrive
+     * with the escapes still in them. Nothing here renders them, so they have to come out.
+     * Matches the general CSI form rather than just the colour codes.
+     */
+    public static String stripAnsi(String string) {
+        return string == null ? null
+                : string.replaceAll("\u001B\\[[0-9;?]*[ -/]*[@-~]", "");
+    }
+
     public static Set<Integer> parseIntRanges(String value) {
         Set<Integer> result = new LinkedHashSet<>();
 
