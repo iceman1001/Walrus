@@ -25,6 +25,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Color;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -32,6 +33,7 @@ import android.os.Bundle;
 import android.preference.PreferenceManager;
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -169,8 +171,26 @@ public class WalletActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
                     }
                 });
 
+        // Built by hand rather than with inflate(R.menu.menu_wallet_fab), because the menu
+        // carries no colours: fab-speed-dial used to draw white mini FABs with dark icons
+        // (app:miniFabBackgroundTint), and inflate() would leave white-on-default ones.
         SpeedDialView fabSpeedDial = findViewById(R.id.floatingActionButton);
-        fabSpeedDial.inflate(R.menu.menu_wallet_fab);
+        int miniFabBackground = Color.WHITE;
+        int miniFabIcon = ContextCompat.getColor(this, R.color.primaryDarkColor);
+        fabSpeedDial.addActionItem(
+                new SpeedDialActionItem.Builder(R.id.add_new_card,
+                        R.drawable.ic_add_box_white_24px)
+                        .setLabel(R.string.add_new_card)
+                        .setFabBackgroundColor(miniFabBackground)
+                        .setFabImageTintColor(miniFabIcon)
+                        .create());
+        fabSpeedDial.addActionItem(
+                new SpeedDialActionItem.Builder(R.id.bulk_read_cards,
+                        R.drawable.ic_library_add_white_24px)
+                        .setLabel(R.string.bulk_read_cards)
+                        .setFabBackgroundColor(miniFabBackground)
+                        .setFabImageTintColor(miniFabIcon)
+                        .create());
         fabSpeedDial.setOnActionSelectedListener(new SpeedDialView.OnActionSelectedListener() {
             @Override
             public boolean onActionSelected(SpeedDialActionItem actionItem) {

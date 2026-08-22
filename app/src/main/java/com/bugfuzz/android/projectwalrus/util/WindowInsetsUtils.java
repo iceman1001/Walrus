@@ -26,7 +26,9 @@ import androidx.annotation.NonNull;
 import androidx.core.graphics.Insets;
 import androidx.core.view.OnApplyWindowInsetsListener;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 /**
  * Edge-to-edge is mandatory from targetSdk 35 on, so activity content would otherwise be drawn
@@ -46,6 +48,15 @@ public final class WindowInsetsUtils {
         if (content == null) {
             return;
         }
+
+        // The system bars are transparent under edge-to-edge, so what shows through the padding
+        // below is the light window background. Ask for dark bar icons to match; without this the
+        // status bar's white clock and icons sit on white and cannot be read.
+        WindowInsetsControllerCompat controller =
+                WindowCompat.getInsetsController(activity.getWindow(),
+                        activity.getWindow().getDecorView());
+        controller.setAppearanceLightStatusBars(true);
+        controller.setAppearanceLightNavigationBars(true);
 
         ViewCompat.setOnApplyWindowInsetsListener(content, new OnApplyWindowInsetsListener() {
             @Override

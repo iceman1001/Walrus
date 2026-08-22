@@ -50,6 +50,17 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         @Override
+        public boolean onPreferenceTreeClick(Preference preference) {
+            if ("open_source_licenses".equals(preference.getKey())) {
+                startActivity(WebViewActivity.getStartActivityIntent(requireContext(),
+                        "file:///android_asset/open_source.html"));
+                return true;
+            }
+
+            return super.onPreferenceTreeClick(preference);
+        }
+
+        @Override
         public void onDisplayPreferenceDialog(Preference preference) {
             if (preference instanceof DeleteAllCardsPreference) {
                 DialogFragment dialogFragment =

@@ -141,14 +141,10 @@
             android:parentActivityName=".card.ui.WalletActivity"
             android:theme="@style/AppPreference.SettingActivity"/>
 
+        <!-- Started explicitly by WebViewActivity.getStartActivityIntent(). -->
         <activity
             android:name=".ui.WebViewActivity"
-            android:exported="false">
-            <intent-filter>
-                <action android:name=".ui.WebViewActivity"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-            </intent-filter>
-        </activity>
+            android:exported="false"/>
 
     </application>
 
