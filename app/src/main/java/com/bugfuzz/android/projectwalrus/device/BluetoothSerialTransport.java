@@ -50,6 +50,8 @@ public class BluetoothSerialTransport implements SerialCardDevice.Transport {
     /** The Serial Port Profile service UUID; resolves to RFCOMM channel 1 on these modules. */
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
+    private static final long SETTLE_DELAY_MS = 500;
+
     private final Context context;
     private final BluetoothDevice bluetoothDevice;
 
@@ -101,6 +103,16 @@ public class BluetoothSerialTransport implements SerialCardDevice.Transport {
 
         outputStream = socket.getOutputStream();
         final InputStream inputStream = socket.getInputStream();
+
+        // The RFCOMM link comes up a little before the module's UART bridge is actually passing
+        // bytes, and anything written into that gap is swallowed. The first thing Walrus sends is
+        // the version handshake, so losing it means the device never reports itself.
+        // CHECKSTYLE:OFF EmptyCatchBlock
+        try {
+            Thread.sleep(SETTLE_DELAY_MS);
+        } catch (InterruptedException ignored) {
+        }
+        // CHECKSTYLE:ON EmptyCatchBlock
 
         readThread = new Thread(new Runnable() {
             @Override

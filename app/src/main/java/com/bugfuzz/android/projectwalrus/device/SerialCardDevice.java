@@ -74,6 +74,12 @@ public abstract class SerialCardDevice<T> extends CardDevice {
     }
 
     private void onBytesReceived(byte[] in) {
+        // Logged separately from the sliced frames below: when a link is up but the peer is
+        // silent, the difference between "no bytes at all" and "bytes that do not frame" is the
+        // whole diagnosis.
+        Logger.getAnonymousLogger().info("<<< read: " + in.length + " bytes - "
+                + MiscUtils.bytesToHex(in, false));
+
         buffer = ArrayUtils.addAll(buffer, in);
 
         for (; ; ) {

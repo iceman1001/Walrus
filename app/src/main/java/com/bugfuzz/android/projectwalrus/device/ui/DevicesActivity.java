@@ -98,6 +98,11 @@ public class DevicesActivity extends AppCompatActivity
         intentFilter.addAction(CardDevice.ACTION_STATUS_UPDATE);
         LocalBroadcastManager.getInstance(this).registerReceiver(deviceUpdateBroadcastReceiver,
                 intentFilter);
+
+        // A device can be added while this activity is paused - connecting over Bluetooth is done
+        // from an activity stacked on top of this one - and the broadcast is missed, so re-read
+        // the list on the way back in.
+        adapter.notifyDataSetChanged();
     }
 
     @Override
