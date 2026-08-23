@@ -1,5 +1,6 @@
 /*
  * Copyright 2018 Daniel Underhay & Matthew Daley.
+ * Copyright 2026 Iceman
  *
  * This file is part of Walrus.
  *
@@ -19,6 +20,7 @@
 
 package com.bugfuzz.android.projectwalrus.card.carddata;
 
+import androidx.annotation.ColorRes;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
@@ -35,7 +37,13 @@ public abstract class CardData implements Serializable, Cloneable {
         // noinspection unchecked
         return new Class[]{
                 HIDCardData.class,
-                MifareCardData.class
+                MifareCardData.class,
+                IClassCardData.class,
+                IClassSeCardData.class,
+                IClassSrCardData.class,
+                SeosCardData.class,
+                DesfireCardData.class,
+                UltralightCCardData.class
         };
     }
 
@@ -57,6 +65,14 @@ public abstract class CardData implements Serializable, Cloneable {
         String name();
 
         @DrawableRes int iconId();
+
+        /**
+         * The card's face colour, and the text colour that goes on it. Left at 0 to fall back to
+         * the common card colours, which is what the older card types do.
+         */
+        @ColorRes int backgroundColorId() default 0;
+
+        @ColorRes int textColorId() default 0;
 
         Class<? extends DialogFragment> viewDialogFragmentClass() default DialogFragment.class;
 

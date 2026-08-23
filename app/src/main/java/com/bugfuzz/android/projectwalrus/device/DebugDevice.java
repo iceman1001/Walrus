@@ -1,5 +1,6 @@
 /*
  * Copyright 2018 Daniel Underhay & Matthew Daley.
+ * Copyright 2026 Iceman
  *
  * This file is part of Walrus.
  *
@@ -27,15 +28,23 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.carddata.CardData;
+import com.bugfuzz.android.projectwalrus.card.carddata.DesfireCardData;
 import com.bugfuzz.android.projectwalrus.card.carddata.HIDCardData;
+import com.bugfuzz.android.projectwalrus.card.carddata.IClassCardData;
+import com.bugfuzz.android.projectwalrus.card.carddata.IClassSeCardData;
+import com.bugfuzz.android.projectwalrus.card.carddata.IClassSrCardData;
 import com.bugfuzz.android.projectwalrus.card.carddata.MifareCardData;
+import com.bugfuzz.android.projectwalrus.card.carddata.SeosCardData;
+import com.bugfuzz.android.projectwalrus.card.carddata.UltralightCCardData;
 
 import java.lang.reflect.InvocationTargetException;
 
 @CardDevice.Metadata(
         name = "_Debug Device",
         iconId = R.drawable.drawable_debug_device,
-        supportsRead = {HIDCardData.class, MifareCardData.class},
+        supportsRead = {HIDCardData.class, MifareCardData.class, IClassCardData.class,
+                IClassSeCardData.class, IClassSrCardData.class, SeosCardData.class,
+                DesfireCardData.class, UltralightCCardData.class},
         supportsWrite = {HIDCardData.class, MifareCardData.class},
         supportsEmulate = {HIDCardData.class, MifareCardData.class}
 )

@@ -1,5 +1,6 @@
 /*
  * Copyright 2018 Daniel Underhay & Matthew Daley.
+ * Copyright 2026 Iceman
  *
  * This file is part of Walrus.
  *
@@ -21,6 +22,9 @@ package com.bugfuzz.android.projectwalrus.card.ui;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+
+import androidx.annotation.ColorRes;
+import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
@@ -46,6 +50,8 @@ public class WalrusCardView extends FrameLayout {
     private TextView nameView;
     private TextView humanReadableTextView;
     private ImageView logoView;
+    private TextView wordmarkView;
+    private CardView cardView;
 
     public WalrusCardView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
@@ -79,9 +85,11 @@ public class WalrusCardView extends FrameLayout {
         View view = inflate(getContext(), R.layout.view_walruscard, null);
         addView(view);
 
+        cardView = view.findViewById(R.id.cardView);
         nameView = view.findViewById(R.id.name);
         editableNameView = view.findViewById(R.id.editableName);
         logoView = view.findViewById(R.id.logo);
+        wordmarkView = view.findViewById(R.id.wordmark);
         humanReadableTextView = view.findViewById(R.id.humanReadableText);
 
         editableNameView.addTextChangedListener(new UIUtils.TextChangeWatcher() {
@@ -166,14 +174,45 @@ public class WalrusCardView extends FrameLayout {
                     CardData.Metadata.class);
             logoView.setImageDrawable(ContextCompat.getDrawable(getContext(), metadata.iconId()));
             logoView.setContentDescription(metadata.name());
+            wordmarkView.setText(metadata.name());
             humanReadableTextView.setText(card.cardData.getHumanReadableText());
+
+            applyFaceColors(metadata.backgroundColorId(), metadata.textColorId());
         } else {
             logoView.setImageDrawable(null);
+            wordmarkView.setText("");
             humanReadableTextView.setText("");
+
+            applyFaceColors(0, 0);
         }
 
         invalidate();
         requestLayout();
+    }
+
+    /**
+     * Paints the card face in the technology's own colours, falling back to the common ones when a
+     * card type does not name any. Always sets both, rather than only the override: these views are
+     * recycled down the wallet, so a card that wants the default has to say so.
+     */
+    private void applyFaceColors(@ColorRes int backgroundColorId, @ColorRes int textColorId) {
+        int background = ContextCompat.getColor(getContext(),
+                backgroundColorId != 0 ? backgroundColorId : R.color.primaryCardBackground);
+        int text = ContextCompat.getColor(getContext(),
+                textColorId != 0 ? textColorId : R.color.primaryCardTextColor);
+
+        cardView.setCardBackgroundColor(background);
+        nameView.setTextColor(text);
+        editableNameView.setTextColor(text);
+        wordmarkView.setTextColor(text);
+
+        // The technology icons are drawn as flat black line art precisely so that they can take
+        // the card's own text colour here; the older bitmap logos are left alone.
+        if (textColorId != 0) {
+            logoView.setColorFilter(text);
+        } else {
+            logoView.clearColorFilter();
+        }
     }
 
     public void setEditable(boolean editable) {

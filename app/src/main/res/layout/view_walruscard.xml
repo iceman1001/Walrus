@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   ~ Copyright 2018 Daniel Underhay & Matthew Daley.
+  ~ Copyright 2026 Iceman
   ~
   ~ This file is part of Walrus.
   ~
@@ -22,6 +23,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/cardView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     app:cardBackgroundColor="@color/primaryCardBackground"
@@ -64,14 +66,39 @@
 
             </FrameLayout>
 
-            <ImageView
-                android:id="@+id/logo"
+            <!--
+                The icon with the technology's name under it. The name is set as plain text
+                rather than as a vendor logo: naming the product it holds is what identifies the
+                card, and it carries none of the trademark baggage that shipping someone's mark
+                inside a GPL app does.
+            -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
                 android:paddingEnd="20dp"
                 android:paddingStart="20dp"
-                android:paddingTop="16dp"
-                tools:ignore="ContentDescription"/>
+                android:paddingTop="16dp">
+
+                <ImageView
+                    android:id="@+id/logo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    tools:ignore="ContentDescription"/>
+
+                <TextView
+                    android:id="@+id/wordmark"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:letterSpacing="0.08"
+                    android:textAllCaps="true"
+                    android:textColor="@color/primaryCardTextColor"
+                    android:textSize="11sp"
+                    android:textStyle="bold"/>
+
+            </LinearLayout>
 
         </TableRow>
 

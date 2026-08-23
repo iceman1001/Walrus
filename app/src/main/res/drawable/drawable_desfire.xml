@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Copyright 2026 Iceman
+  ~
+  ~ This file is part of Walrus.
+  ~
+  ~ Walrus is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ Walrus is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with Walrus.  If not, see <http://www.gnu.org/licenses/>.
+  -->
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- The common card silhouette: every technology shares it, the mark inside differs. -->
+    <path
+        android:pathData="M4,6 L20,6 A2,2 0 0 1 22,8 L22,16 A2,2 0 0 1 20,18 L4,18 A2,2 0 0 1 2,16 L2,8 A2,2 0 0 1 4,6 Z"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.4"/>
+
+    <!-- A chip module: DESFire is an application platform, not a fixed memory map. -->
+    <path
+        android:pathData="M8,9 L16,9 A1,1 0 0 1 17,10 L17,14 A1,1 0 0 1 16,15 L8,15 A1,1 0 0 1 7,14 L7,10 A1,1 0 0 1 8,9 Z"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.4"/>
+    <path
+        android:pathData="M12,9 L12,15 M7,12 L17,12"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.1"/>
+
+</vector>

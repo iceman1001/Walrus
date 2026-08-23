@@ -32,6 +32,28 @@
     <color name="secondaryCardTextColor">#e0e0e0</color>
     <color name="secondaryCardBackground">#374c4f</color>
 
+    <!--
+        Per card technology. Each pairs a primary face colour with a text colour chosen for
+        contrast against it; the secondary strip along the bottom stays common to every card.
+    -->
+    <color name="cardBackgroundIClass">#b0c4d8</color>
+    <color name="cardTextIClass">#16232e</color>
+
+    <color name="cardBackgroundIClassSe">#1f3a5f</color>
+    <color name="cardTextIClassSe">#eef3f8</color>
+
+    <color name="cardBackgroundIClassSr">#2f6690</color>
+    <color name="cardTextIClassSr">#f0f5fa</color>
+
+    <color name="cardBackgroundSeos">#37474f</color>
+    <color name="cardTextSeos">#eceff1</color>
+
+    <color name="cardBackgroundDesfire">#d9902b</color>
+    <color name="cardTextDesfire">#2b1c05</color>
+
+    <color name="cardBackgroundUltralightC">#6f9a52</color>
+    <color name="cardTextUltralightC">#f3f7ec</color>
+
     <color name="ic_launcher_background">#00AAC1</color>
 
 </resources>
