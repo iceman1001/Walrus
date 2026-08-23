@@ -19,16 +19,18 @@
 
 package com.bugfuzz.android.projectwalrus.device.proxmark3;
 
-import android.arch.lifecycle.Observer;
+import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.usb.UsbDevice;
-import android.support.annotation.Keep;
-import android.support.annotation.Nullable;
-import android.support.annotation.UiThread;
-import android.support.annotation.WorkerThread;
-import android.support.v7.app.AppCompatActivity;
 import android.util.Pair;
+
+import androidx.annotation.Keep;
+import androidx.annotation.Nullable;
+import androidx.annotation.UiThread;
+import androidx.annotation.WorkerThread;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.Observer;
 
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.carddata.CardData;
@@ -39,12 +41,12 @@ import com.bugfuzz.android.projectwalrus.card.carddata.MifareReadStep;
 import com.bugfuzz.android.projectwalrus.card.carddata.ui.MifareReadSetupDialogFragment;
 import com.bugfuzz.android.projectwalrus.device.CardDevice;
 import com.bugfuzz.android.projectwalrus.device.ReadCardDataOperation;
-import com.bugfuzz.android.projectwalrus.device.UsbCardDevice;
-import com.bugfuzz.android.projectwalrus.device.UsbSerialCardDevice;
+import com.bugfuzz.android.projectwalrus.device.BluetoothSerialTransport;
+import com.bugfuzz.android.projectwalrus.device.SerialCardDevice;
+import com.bugfuzz.android.projectwalrus.device.UsbSerialTransport;
 import com.bugfuzz.android.projectwalrus.device.WriteOrEmulateCardDataOperation;
 import com.bugfuzz.android.projectwalrus.device.proxmark3.ui.Proxmark3Activity;
-import com.felhr.usbserial.UsbSerialDevice;
-import com.felhr.usbserial.UsbSerialInterface;
+import com.bugfuzz.android.projectwalrus.util.MiscUtils;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.parceler.Parcel;
@@ -61,6 +63,14 @@ import java.util.regex.Pattern;
 
 // TODO: do periodic VERSION-based device-aliveness checking like Chameleon Mini will/does
 
+/**
+ * Speaks the Proxmark3 NG protocol (see {@link Proxmark3CommandNG}).
+ *
+ * <p>This used to be split into a legacy 544-byte {@code PacketCommandOLD} implementation and a
+ * separate NG one for the Iceman fork. That split no longer buys anything: current firmware still
+ * accepts legacy commands, but every response it sends goes through {@code reply_ng_internal()}
+ * and is NG-framed, so a legacy-only client can talk but never listen.
+ */
 @CardDevice.Metadata(
         name = "Proxmark3",
         iconId = R.drawable.drawable_proxmark3,
@@ -68,48 +78,95 @@ import java.util.regex.Pattern;
         supportsWrite = {HIDCardData.class},
         supportsEmulate = {}
 )
-@UsbCardDevice.UsbIds({
-        @UsbCardDevice.UsbIds.Ids(vendorId = 0x2d2d, productId = 0x504d), // CDC Proxmark3
-        @UsbCardDevice.UsbIds.Ids(vendorId = 0x9ac4, productId = 0x4b8f), // HID Proxmark3
-        @UsbCardDevice.UsbIds.Ids(vendorId = 0x502d, productId = 0x502d)  // Proxmark3 Easy(?)
+@CardDevice.UsbIds({
+        @CardDevice.UsbIds.Ids(vendorId = 0x2d2d, productId = 0x504d), // CDC Proxmark3
+        @CardDevice.UsbIds.Ids(vendorId = 0x9ac4, productId = 0x4b8f), // HID Proxmark3
+        @CardDevice.UsbIds.Ids(vendorId = 0x502d, productId = 0x502d)  // Proxmark3 Easy(?)
 })
-public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3Command>
+// The Blue Shark add-on ships advertising "PM3_RDV4.0"; the plain "PM3" prefix covers the
+// aftermarket HC-05/HC-06 modules people rename themselves.
+@CardDevice.BluetoothIds(namePrefixes = {"PM3", "Proxmark"})
+public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
         implements CardDevice.Versioned, MifareReadStep.BlockSource {
 
     private static final long DEFAULT_TIMEOUT = 20 * 1000;
+
+    /** The client allows 1s per live sample; be a little more forgiving over BT. */
+    private static final long LIVE_TUNE_TIMEOUT = 3 * 1000;
+
+    /** Both the USB CDC port and the Blue Shark UART run at this rate. */
+    private static final int BAUD_RATE = 115200;
+
+    /**
+     * lf_hid_watch() in armsrc/lfops.c reports a decoded tag as a debug string, not in the reply
+     * to CMD_LF_HID_WATCH, which carries a status and nothing else. The colour escapes it wraps
+     * the value in are stripped by {@link Proxmark3CommandNG#debugString()} before this matches.
+     *
+     * <p>The two shapes it emits are
+     * {@code TAG ID: %x%08x (%d) - Format Len: %d bit - FC: %d - Card: %d} for standard tags and
+     * {@code TAG ID: %x%08x%08x (%d)} for the 88/192 bit ones.
+     */
     private static final Pattern TAG_ID = Pattern.compile("TAG ID: ([0-9a-fA-F]+)");
 
     private final Semaphore semaphore = new Semaphore(1);
 
     @Keep
     public Proxmark3Device(Context context, UsbDevice usbDevice) throws IOException {
-        super(context, usbDevice, context.getString(R.string.idle));
+        this(context, new UsbSerialTransport(context, usbDevice, BAUD_RATE));
+    }
 
-        send(new Proxmark3Command(Proxmark3Command.VERSION));
+    @Keep
+    public Proxmark3Device(Context context, BluetoothDevice bluetoothDevice) throws IOException {
+        this(context, new BluetoothSerialTransport(context, bluetoothDevice));
+    }
+
+    private Proxmark3Device(Context context, Transport transport) throws IOException {
+        super(context, transport, context.getString(R.string.idle));
+
+        send(Proxmark3CommandNG.ng(Proxmark3CommandNG.VERSION));
     }
 
     @Override
-    protected void setupSerialParams(UsbSerialDevice usbSerialDevice) {
-        usbSerialDevice.setBaudRate(115200);
-
-        usbSerialDevice.setDataBits(UsbSerialInterface.DATA_BITS_8);
-        usbSerialDevice.setParity(UsbSerialInterface.PARITY_NONE);
-        usbSerialDevice.setStopBits(UsbSerialInterface.STOP_BITS_1);
-
-        usbSerialDevice.setFlowControl(UsbSerialInterface.FLOW_CONTROL_OFF);
-    }
-
-    @Override
-    protected Pair<Proxmark3Command, Integer> sliceIncoming(byte[] in) {
-        if (in.length < Proxmark3Command.getByteLength()) {
+    protected Pair<Proxmark3CommandNG, Integer> sliceIncoming(byte[] in) {
+        if (in.length < Proxmark3CommandNG.RESPONSE_PREAMBLE_SIZE) {
             return null;
         }
 
-        return new Pair<>(Proxmark3Command.fromBytes(in), Proxmark3Command.getByteLength());
+        int magic = ByteBuffer.wrap(in, 0, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
+        if (magic != Proxmark3CommandNG.RESPONSENG_PREAMBLE_MAGIC) {
+            // Resynchronise: drop everything up to the next plausible frame start. The sinks all
+            // filter on the opcode, so the placeholder is simply ignored by whoever is listening.
+            int next = indexOfMagic(in, 1);
+            if (next == -1) {
+                // Keep the last few bytes, which may be a magic split across two reads.
+                int keep = Math.min(in.length, 3);
+                return new Pair<>(Proxmark3CommandNG.unknown(), in.length - keep);
+            }
+
+            return new Pair<>(Proxmark3CommandNG.unknown(), next);
+        }
+
+        Proxmark3CommandNG response = Proxmark3CommandNG.responseFromBytes(in);
+        if (response == null) {
+            return null;
+        }
+
+        return new Pair<>(response, response.getResponseByteLength());
+    }
+
+    private static int indexOfMagic(byte[] in, int from) {
+        for (int i = from; i + 4 <= in.length; ++i) {
+            if (ByteBuffer.wrap(in, i, 4).order(ByteOrder.LITTLE_ENDIAN).getInt()
+                    == Proxmark3CommandNG.RESPONSENG_PREAMBLE_MAGIC) {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     @Override
-    protected byte[] formatOutgoing(Proxmark3Command out) {
+    protected byte[] formatOutgoing(Proxmark3CommandNG out) {
         return out.toBytes();
     }
 
@@ -129,8 +186,8 @@ public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3Command>
         semaphore.release();
     }
 
-    private <O> O sendThenReceiveCommands(Proxmark3Command out,
-            ReceiveSink<Proxmark3Command, O> receiveSink) throws IOException {
+    private <O> O sendThenReceiveCommands(Proxmark3CommandNG out,
+            ReceiveSink<Proxmark3CommandNG, O> receiveSink) throws IOException {
         setReceiving(true);
 
         try {
@@ -174,19 +231,27 @@ public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3Command>
     @Override
     public MifareCardData.Block readMifareBlock(int blockNumber, MifareCardData.Key key,
             MifareCardData.KeySlot keySlot) throws IOException {
+        // mf_readblock_t: uint8 blockno, uint8 keytype, uint8 key[6].
+        ByteBuffer payload = ByteBuffer.allocate(8);
+        payload.order(ByteOrder.LITTLE_ENDIAN);
+        payload.put((byte) blockNumber);
+        payload.put((byte) (keySlot == MifareCardData.KeySlot.A ? 0 : 1));
+        payload.put(ArrayUtils.subarray(key.key, 0, 6));
+
         Pair<Boolean, MifareCardData.Block> result = sendThenReceiveCommands(
-                new Proxmark3Command(
-                        Proxmark3Command.MIFARE_READBL,
-                        new long[]{blockNumber, keySlot == MifareCardData.KeySlot.A ? 0 : 1, 0},
-                        key.key),
-                new ReceiveSink<Proxmark3Command, Pair<Boolean, MifareCardData.Block>>() {
+                Proxmark3CommandNG.ng(Proxmark3CommandNG.HF_MIFARE_READBL, payload.array()),
+                new ReceiveSink<Proxmark3CommandNG, Pair<Boolean, MifareCardData.Block>>() {
                     @Override
-                    public Pair<Boolean, MifareCardData.Block> onReceived(Proxmark3Command in) {
-                        if (in.op != Proxmark3Command.ACK) {
+                    public Pair<Boolean, MifareCardData.Block> onReceived(
+                            Proxmark3CommandNG in) {
+                        if (in.cmd != Proxmark3CommandNG.HF_MIFARE_READBL) {
                             return null;
                         }
 
-                        if ((in.args[0] & 0xff) == 0) {
+                        // The firmware replies on the same opcode, carrying the return value of
+                        // mifare_cmd_readblocks() as the NG status and the block as the payload.
+                        if (in.status != Proxmark3CommandNG.PM3_SUCCESS
+                                || in.data.length < MifareCardData.Block.SIZE) {
                             return new Pair<>(false, null);
                         }
 
@@ -220,14 +285,31 @@ public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3Command>
         }
 
         try {
-            Proxmark3Command version = sendThenReceiveCommands(
-                    new Proxmark3Command(Proxmark3Command.VERSION),
-                    new CommandWaiter(Proxmark3Command.ACK, DEFAULT_TIMEOUT));
+            Proxmark3CommandNG version = sendThenReceiveCommands(
+                    Proxmark3CommandNG.ng(Proxmark3CommandNG.VERSION),
+                    new CommandWaiter(Proxmark3CommandNG.VERSION, DEFAULT_TIMEOUT));
             if (version == null) {
                 throw new IOException(context.getString(R.string.get_version_timeout));
             }
 
-            return version.dataAsString();
+            // SendVersion() in armsrc/appmain.c replies with
+            // { uint32 id, uint32 section_size, uint32 versionstr_len, char versionstr[] }.
+            if (version.data.length < 12) {
+                throw new IOException(context.getString(R.string.get_version_timeout));
+            }
+
+            ByteBuffer bb = ByteBuffer.wrap(version.data);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            bb.getInt(); // chip id
+            bb.getInt(); // section size
+            int versionStringLength = bb.getInt();
+
+            // The length includes the terminating NUL.
+            versionStringLength = Math.max(0,
+                    Math.min(versionStringLength - 1, version.data.length - 12));
+
+            return MiscUtils.stripAnsi(new String(
+                    ArrayUtils.subarray(version.data, 12, 12 + versionStringLength)));
         } finally {
             releaseAndSetStatus();
         }
@@ -239,41 +321,143 @@ public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3Command>
         }
 
         try {
-            long arg = 0;
-            if (lf) {
-                arg |= Proxmark3Command.MEASURE_ANTENNA_TUNING_FLAG_TUNE_LF;
-            }
-            if (hf) {
-                arg |= Proxmark3Command.MEASURE_ANTENNA_TUNING_FLAG_TUNE_HF;
-            }
-            if (arg == 0) {
+            if (!lf && !hf) {
                 throw new IllegalArgumentException("Must tune LF or HF");
             }
 
-            Proxmark3Command result = sendThenReceiveCommands(
-                    new Proxmark3Command(Proxmark3Command.MEASURE_ANTENNA_TUNING,
-                            new long[]{arg, 0, 0}),
-                    new CommandWaiter(Proxmark3Command.MEASURED_ANTENNA_TUNING, DEFAULT_TIMEOUT));
+            // CMD_MEASURE_ANTENNA_TUNING takes no payload any more and always sweeps both bands;
+            // the old MEASURE_ANTENNA_TUNING_FLAG_TUNE_* args are gone, as is the separate
+            // MEASURED_ANTENNA_TUNING (0x410) reply opcode. The result now comes back as an NG
+            // response on the same opcode.
+            Proxmark3CommandNG result = sendThenReceiveCommands(
+                    Proxmark3CommandNG.ng(Proxmark3CommandNG.MEASURE_ANTENNA_TUNING),
+                    new CommandWaiter(Proxmark3CommandNG.MEASURE_ANTENNA_TUNING, DEFAULT_TIMEOUT));
             if (result == null) {
                 throw new IOException(context.getString(R.string.tune_timeout));
             }
 
+            // struct p in MeasureAntennaTuning(), armsrc/appmain.c, all in millivolts:
+            // uint32 v_lf134, v_lf125, v_lfconf, v_hf, peak_v, peak_f; int32 divisor;
+            // uint8 results[256].
+            if (result.data.length < 28 + 256) {
+                throw new IOException(context.getString(R.string.tune_timeout));
+            }
+
+            ByteBuffer bb = ByteBuffer.wrap(result.data);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+
+            float vlf134 = (bb.getInt() & 0xffffffffL) / 1e3f;
+            float vlf125 = (bb.getInt() & 0xffffffffL) / 1e3f;
+            bb.getInt(); // voltage at the configured divisor, unused here
+            float vhf = (bb.getInt() & 0xffffffffL) / 1e3f;
+            float peakV = (bb.getInt() & 0xffffffffL) / 1e3f;
+            long peakDivisor = bb.getInt() & 0xffffffffL;
+            bb.getInt(); // sampling config divisor, unused here
+
             float[] lfVoltages = new float[256];
             for (int i = 0; i < 256; ++i) {
-                lfVoltages[i] = ((result.data[i] & 0xff) << 8) / 1e3f;
+                // The firmware scales each sample down with "adcval >> 9" so that it fits in a
+                // byte for graphing; undo that to get back to millivolts, then to volts.
+                lfVoltages[i] = ((result.data[28 + i] & 0xff) << 9) / 1e3f;
             }
 
             return new TuneResult(
                     lf, hf,
                     lf ? lfVoltages : null,
-                    lf ? (result.args[0] & 0xffff) / 1e3f : null,
-                    lf ? (result.args[0] >>> 16) / 1e3f : null,
-                    lf ? 12e6f / ((result.args[2] & 0xffff) + 1) : null,
-                    lf ? (result.args[2] >>> 16) / 1e3f : null,
-                    hf ? (result.args[1] & 0xffff) / 1e3f : null);
+                    lf ? vlf125 : null,
+                    lf ? vlf134 : null,
+                    lf ? 12e6f / (peakDivisor + 1) : null,
+                    lf ? peakV : null,
+                    hf ? vhf : null);
         } finally {
             releaseAndSetStatus();
         }
+    }
+
+    /**
+     * The continuous measurement behind the client's {@code lf tune} and {@code hf tune}, which
+     * is a different thing from {@code hw tune}: rather than sweeping the LF band once, the
+     * firmware parks the field at one frequency and hands back a fresh reading each time it is
+     * asked, until told to stop.
+     *
+     * <p>Protocol, from client/src/cmdlf.c and cmdhf.c: send mode 1 to start, mode 2 repeatedly
+     * to sample, mode 3 to shut the field down. LF carries {mode, divisor} and the firmware
+     * rejects anything that is not exactly two bytes; HF carries {mode} and insists on one. A
+     * reply with status PM3_EOPABORTED means the button on the Proxmark3 was pressed.
+     *
+     * <p>Blocks until the sink stops wanting more, so call it off the main thread.
+     */
+    public void liveTune(boolean lf, LiveTuneSink sink) throws IOException {
+        if (!tryAcquireAndSetStatus(context.getString(R.string.tuning))) {
+            throw new IOException(context.getString(R.string.device_busy));
+        }
+
+        try {
+            int op = lf ? Proxmark3CommandNG.MEASURE_ANTENNA_TUNING_LF
+                    : Proxmark3CommandNG.MEASURE_ANTENNA_TUNING_HF;
+
+            if (sendThenReceiveCommands(
+                    Proxmark3CommandNG.ng(op, tuneModePayload(lf,
+                            Proxmark3CommandNG.TUNE_MODE_START)),
+                    new CommandWaiter(op, DEFAULT_TIMEOUT)) == null) {
+                throw new IOException(context.getString(R.string.tune_timeout));
+            }
+
+            try {
+                byte[] read = tuneModePayload(lf, Proxmark3CommandNG.TUNE_MODE_READ);
+
+                while (sink.wantsMore()) {
+                    Proxmark3CommandNG result = sendThenReceiveCommands(
+                            Proxmark3CommandNG.ng(op, read),
+                            new CommandWaiter(op, LIVE_TUNE_TIMEOUT));
+                    if (result == null) {
+                        throw new IOException(context.getString(R.string.tune_timeout));
+                    }
+
+                    if (result.status == Proxmark3CommandNG.PM3_EOPABORTED) {
+                        // The button on the device was pressed.
+                        break;
+                    }
+
+                    // HF answers with a uint16 on older firmware and a uint32 on current, which
+                    // can exceed 65.535V; the client accepts either.
+                    ByteBuffer bb = ByteBuffer.wrap(result.data);
+                    bb.order(ByteOrder.LITTLE_ENDIAN);
+
+                    if (result.data.length == 4) {
+                        sink.onVoltage(bb.getInt() & 0xffffffffL);
+                    } else if (result.data.length == 2) {
+                        sink.onVoltage(bb.getShort() & 0xffffL);
+                    } else {
+                        break;
+                    }
+                }
+            } finally {
+                sendThenReceiveCommands(
+                        Proxmark3CommandNG.ng(op, tuneModePayload(lf,
+                                Proxmark3CommandNG.TUNE_MODE_STOP)),
+                        new CommandWaiter(op, DEFAULT_TIMEOUT));
+            }
+        } finally {
+            releaseAndSetStatus();
+        }
+    }
+
+    private static byte[] tuneModePayload(boolean lf, int mode) {
+        return lf
+                ? new byte[]{(byte) mode, (byte) Proxmark3CommandNG.LF_DIVISOR_125}
+                : new byte[]{(byte) mode};
+    }
+
+    /** The frequency the live LF measurement parks at, in Hz. */
+    public static float getLiveTuneLfFrequency() {
+        return 12e6f / (Proxmark3CommandNG.LF_DIVISOR_125 + 1);
+    }
+
+    public interface LiveTuneSink {
+        boolean wantsMore();
+
+        void onVoltage(long millivolts);
     }
 
     private static class ReadHIDOperation extends ReadCardDataOperation {
@@ -296,23 +480,23 @@ public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3Command>
                 proxmark3Device.setReceiving(true);
 
                 try {
-                    proxmark3Device.send(new Proxmark3Command(Proxmark3Command.HID_DEMOD_FSK,
-                            new long[]{0, 0, 0}));
+                    proxmark3Device.send(
+                            Proxmark3CommandNG.ng(Proxmark3CommandNG.LF_HID_WATCH));
 
-                    proxmark3Device.receive(new ReceiveSink<Proxmark3Command, Boolean>() {
+                    proxmark3Device.receive(new ReceiveSink<Proxmark3CommandNG, Boolean>() {
                         @Override
-                        public Boolean onReceived(Proxmark3Command in) {
-                            if (in.op != Proxmark3Command.DEBUG_PRINT_STRING) {
-                                return null;
-                            }
-
-                            String dataAsString = in.dataAsString();
-
-                            if (dataAsString.equals("Stopped")) {
+                        public Boolean onReceived(Proxmark3CommandNG in) {
+                            // The watch loop finishes by replying on its own opcode with a status
+                            // and no payload; it no longer prints "Stopped".
+                            if (in.cmd == Proxmark3CommandNG.LF_HID_WATCH) {
                                 return true;
                             }
 
-                            Matcher matcher = TAG_ID.matcher(dataAsString);
+                            if (in.cmd != Proxmark3CommandNG.DEBUG_PRINT_STRING) {
+                                return null;
+                            }
+
+                            Matcher matcher = TAG_ID.matcher(in.debugString());
                             if (matcher.find()) {
                                 resultSink.onResult(new HIDCardData(new BigInteger(
                                         matcher.group(1), 16)));
@@ -330,7 +514,9 @@ public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3Command>
                     proxmark3Device.setReceiving(false);
                 }
 
-                proxmark3Device.send(new Proxmark3Command(Proxmark3Command.VERSION));
+                // lf_hid_watch() breaks out of its loop as soon as anything arrives from the
+                // host (data_available()), so any command will stop it. Ping is the cheapest.
+                proxmark3Device.send(Proxmark3CommandNG.ng(Proxmark3CommandNG.PING));
             } finally {
                 proxmark3Device.releaseAndSetStatus();
             }
@@ -365,20 +551,33 @@ public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3Command>
             try {
                 HIDCardData hidCardData = (HIDCardData) getCardData();
 
+                boolean longFormat = hidCardData.data.bitLength() > 44;
+
+                // lf_hidsim_t: uint32 hi2, uint32 hi, uint32 lo, uint8 longFMT, bool Q5, bool EM.
+                ByteBuffer payload = ByteBuffer.allocate(15);
+                payload.order(ByteOrder.LITTLE_ENDIAN);
+                payload.putInt(hidCardData.data.shiftRight(64).intValue());
+                payload.putInt(hidCardData.data.shiftRight(32).intValue());
+                payload.putInt(hidCardData.data.intValue());
+                payload.put((byte) (longFormat ? 1 : 0));
+                payload.put((byte) 0); // Q5
+                payload.put((byte) 0); // EM
+
                 if (!proxmark3Device.sendThenReceiveCommands(
-                        new Proxmark3Command(
-                                Proxmark3Command.HID_CLONE_TAG,
-                                new long[]{
-                                        hidCardData.data.shiftRight(64).intValue(),
-                                        hidCardData.data.shiftRight(32).intValue(),
-                                        hidCardData.data.intValue()
-                                },
-                                new byte[]{hidCardData.data.bitLength() > 44 ? (byte) 1 : 0}),
-                        new WatchdogReceiveSink<Proxmark3Command, Boolean>(DEFAULT_TIMEOUT) {
+                        Proxmark3CommandNG.ng(Proxmark3CommandNG.LF_HID_CLONE, payload.array()),
+                        new WatchdogReceiveSink<Proxmark3CommandNG, Boolean>(DEFAULT_TIMEOUT) {
                             @Override
-                            public Boolean onReceived(Proxmark3Command in) {
-                                return in.op == Proxmark3Command.DEBUG_PRINT_STRING
-                                        && in.dataAsString().equals("DONE!") ? true : null;
+                            public Boolean onReceived(Proxmark3CommandNG in) {
+                                if (in.cmd == Proxmark3CommandNG.WTX) {
+                                    resetWatchdog();
+                                    return null;
+                                }
+
+                                // CopyHIDtoT55x7() finishes with reply_ng(CMD_LF_HID_CLONE, ...);
+                                // it no longer prints "DONE!".
+                                return in.cmd == Proxmark3CommandNG.LF_HID_CLONE
+                                        && in.status == Proxmark3CommandNG.PM3_SUCCESS
+                                        ? true : null;
                             }
                         })) {
                     throw new IOException(context.getString(R.string.write_card_timeout));
@@ -414,21 +613,26 @@ public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3Command>
 
                 while (shouldContinueCallback.shouldContinue()) {
                     // TODO: configurable ratelimiting?
-                    Proxmark3Command result = proxmark3Device.sendThenReceiveCommands(
-                            new Proxmark3Command(Proxmark3Command.READER_ISO_14443A,
-                                    new long[]{Proxmark3Command.ISO14A_CONNECT, 0, 0}),
-                            new CommandWaiter(Proxmark3Command.ACK, DEFAULT_TIMEOUT));
+                    // ReaderIso14443a() still reads its flags out of oldarg[0] and still answers
+                    // with reply_mix(CMD_ACK, ...), so this one stays a MIX frame.
+                    Proxmark3CommandNG result = proxmark3Device.sendThenReceiveCommands(
+                            Proxmark3CommandNG.mix(Proxmark3CommandNG.HF_ISO14443A_READER,
+                                    new long[]{Proxmark3CommandNG.ISO14A_CONNECT, 0, 0},
+                                    new byte[0]),
+                            new CommandWaiter(Proxmark3CommandNG.ACK, DEFAULT_TIMEOUT));
 
                     if (result == null) {
                         break;
                     }
 
-                    if (result.args[0] == 0) {
+                    if (result.oldargs[0] == 0) {
                         continue;
                     }
 
                     ISO14443ACardData iso14443APart = new ISO14443ACardData();
 
+                    // iso14a_card_select_t, include/mifare.h: uint8 uid[10], uint8 uidlen,
+                    // uint8 atqa[2], uint8 sak, uint8 ats_len, uint8 ats[256].
                     ByteBuffer bb = ByteBuffer.wrap(result.data);
                     bb.order(ByteOrder.LITTLE_ENDIAN);
 
@@ -437,7 +641,7 @@ public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3Command>
                     iso14443APart.uid = new BigInteger(ArrayUtils.subarray(uidBytes, 0, bb.get()));
                     iso14443APart.atqa = bb.getShort();
                     iso14443APart.sak = bb.get();
-                    iso14443APart.ats = new byte[bb.get()];
+                    iso14443APart.ats = new byte[bb.get() & 0xff];
                     bb.get(iso14443APart.ats);
 
                     if (!iso14443APart.equals(lastIso14443APart)) {
@@ -475,19 +679,29 @@ public class Proxmark3Device extends UsbSerialCardDevice<Proxmark3Command>
     }
 
     private static class CommandWaiter
-            extends WatchdogReceiveSink<Proxmark3Command, Proxmark3Command> {
+            extends WatchdogReceiveSink<Proxmark3CommandNG, Proxmark3CommandNG> {
 
-        private final long op;
+        @Proxmark3CommandNG.Opcode
+        private final int cmd;
 
-        CommandWaiter(long op, @SuppressWarnings("SameParameterValue") long timeout) {
+        CommandWaiter(@Proxmark3CommandNG.Opcode int cmd,
+                @SuppressWarnings("SameParameterValue") long timeout) {
             super(timeout);
 
-            this.op = op;
+            this.cmd = cmd;
         }
 
         @Override
-        public Proxmark3Command onReceived(Proxmark3Command in) {
-            return in.op == op ? in : null;
+        public Proxmark3CommandNG onReceived(Proxmark3CommandNG in) {
+            // A slow operation asks for more time rather than going quiet: an antenna tune sends
+            // two of these before its result. The real client adds the requested milliseconds to
+            // its timeout (client/src/comms.c); restarting the watchdog has the same effect.
+            if (in.cmd == Proxmark3CommandNG.WTX) {
+                resetWatchdog();
+                return null;
+            }
+
+            return in.cmd == cmd ? in : null;
         }
     }
 

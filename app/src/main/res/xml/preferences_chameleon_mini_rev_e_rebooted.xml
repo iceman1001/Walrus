@@ -18,7 +18,7 @@
   ~ along with Walrus.  If not, see <http://www.gnu.org/licenses/>.
   -->
 
-<android.support.v7.preference.PreferenceScreen
+<androidx.preference.PreferenceScreen
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
@@ -31,4 +31,4 @@
         app:minSlot="1"
         app:maxSlot="8"/>
 
-</android.support.v7.preference.PreferenceScreen>
+</androidx.preference.PreferenceScreen>

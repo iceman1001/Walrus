@@ -23,14 +23,13 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v4.app.DialogFragment;
+import androidx.annotation.NonNull;
+import androidx.fragment.app.DialogFragment;
 import android.util.TypedValue;
 
-import com.afollestad.materialdialogs.DialogAction;
-import com.afollestad.materialdialogs.MaterialDialog;
 import com.bugfuzz.android.projectwalrus.device.CardDataIOOperation;
 import com.bugfuzz.android.projectwalrus.device.ReadCardDataOperation;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class CardDataIOOperationDialogFragment extends DialogFragment {
 
@@ -73,18 +72,17 @@ public class CardDataIOOperationDialogFragment extends DialogFragment {
         cardDataIOView.setCardDataClass(cardDataIOOperation.getCardDataClass());
         cardDataIOView.setDirection(cardDataIOOperation instanceof ReadCardDataOperation);
 
-        return new MaterialDialog.Builder(getActivity())
-                .title(cardDataIOOperation.getWaitingStringId())
-                .negativeText(cardDataIOOperation.getStopStringId())
-                .onNegative(new MaterialDialog.SingleButtonCallback() {
-                    @Override
-                    public void onClick(@NonNull MaterialDialog dialog,
-                            @NonNull DialogAction which) {
-                        dialog.cancel();
-                    }
-                })
-                .customView(cardDataIOView, false)
-                .build();
+        return new MaterialAlertDialogBuilder(getActivity())
+                .setTitle(cardDataIOOperation.getWaitingStringId())
+                .setNegativeButton(cardDataIOOperation.getStopStringId(),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                dialog.cancel();
+                            }
+                        })
+                .setView(cardDataIOView)
+                .create();
     }
 
     @Override

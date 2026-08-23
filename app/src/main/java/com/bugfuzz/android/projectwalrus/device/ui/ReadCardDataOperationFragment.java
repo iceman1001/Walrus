@@ -21,7 +21,7 @@ package com.bugfuzz.android.projectwalrus.device.ui;
 
 import android.content.Context;
 import android.os.Bundle;
-import android.support.annotation.WorkerThread;
+import androidx.annotation.WorkerThread;
 
 import com.bugfuzz.android.projectwalrus.card.carddata.CardData;
 import com.bugfuzz.android.projectwalrus.device.ReadCardDataOperation;

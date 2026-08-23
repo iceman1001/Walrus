@@ -20,8 +20,8 @@
 package com.bugfuzz.android.projectwalrus.card.carddata;
 
 import android.os.Bundle;
-import android.support.annotation.LayoutRes;
-import android.support.annotation.Nullable;
+import androidx.annotation.LayoutRes;
+import androidx.annotation.Nullable;
 
 import com.bugfuzz.android.projectwalrus.card.carddata.ui.MifareReadStepDialogFragment;
 import com.bugfuzz.android.projectwalrus.device.CardDeviceOperation;

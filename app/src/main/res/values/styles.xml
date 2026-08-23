@@ -20,11 +20,28 @@
 
 <resources>
 
-    <style name="App" parent="Theme.AppCompat.Light.NoActionBar">
+    <!--
+      Bridge themes: they inherit from the AppCompat themes this app has always used and
+      only add the extra attributes Material Components needs (colorSurface and friends),
+      which MaterialAlertDialogBuilder throws without. Widget styling is unchanged.
+      -->
+    <style name="App" parent="Theme.MaterialComponents.Light.NoActionBar.Bridge">
         <item name="colorPrimary">@color/primaryColor</item>
         <item name="colorPrimaryDark">@color/primaryDarkColor</item>
         <item name="colorAccent">@color/secondaryColor</item>
         <item name="preferenceTheme">@style/PreferenceThemeOverlay.v14.Material</item>
+        <item name="materialAlertDialogTheme">@style/App.AlertDialog</item>
+    </style>
+
+    <!--
+      AppPreference.SettingActivity sets android:textColorPrimary to white so that the settings
+      toolbar title is white. MaterialAlertDialogBuilder resolves its body text colour from the
+      host activity's theme, which made dialog messages white on white. Pin the dialog's own
+      text colours here instead of unpicking the toolbar hack.
+      -->
+    <style name="App.AlertDialog" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="android:textColorPrimary">@color/primaryCardTextColor</item>
+        <item name="android:textColorSecondary">@color/primaryCardTextColor</item>
     </style>
 
     <style name="AppPreference">
@@ -35,7 +52,7 @@
        <item name="android:textColor">@color/primaryColor</item>
     </style>
 
-    <style name="AppPreference.SettingActivity"  parent="Theme.AppCompat.Light">
+    <style name="AppPreference.SettingActivity"  parent="Theme.MaterialComponents.Light.Bridge">
         <item name="android:textColorPrimary">#FFFFFF</item>
         <item name="android:textColor">#212121</item>
         <item name="colorPrimary">@color/primaryColor</item>
@@ -44,6 +61,7 @@
         <item name="colorControlNormal">@color/primaryDarkColor</item>
         <item name="colorControlActivated">@color/primaryColor</item>
         <item name="preferenceTheme">@style/PreferenceThemeOverlay.v14.Material</item>
+        <item name="materialAlertDialogTheme">@style/App.AlertDialog</item>
     </style>
 
     <style name="App.WithTransitions"/>

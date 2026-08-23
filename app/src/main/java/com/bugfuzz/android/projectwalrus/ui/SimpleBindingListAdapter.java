@@ -19,13 +19,14 @@
 
 package com.bugfuzz.android.projectwalrus.ui;
 
-import android.databinding.DataBindingUtil;
-import android.databinding.ViewDataBinding;
-import android.support.annotation.LayoutRes;
-import android.support.annotation.NonNull;
-import android.support.v7.recyclerview.extensions.ListAdapter;
-import android.support.v7.util.DiffUtil;
-import android.support.v7.widget.RecyclerView;
+import androidx.databinding.DataBindingUtil;
+import androidx.databinding.ViewDataBinding;
+import androidx.annotation.LayoutRes;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.ListAdapter;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.RecyclerView;
+import android.annotation.SuppressLint;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
@@ -39,6 +40,10 @@ public abstract class SimpleBindingListAdapter<T extends SimpleBindingListAdapte
                 return oldItem.getId() == newItem.getId();
             }
 
+            // DiffUtilEquals fires because Item is used raw here, so getContents() erases to
+            // Object. Every Item implementation returns a type that overrides equals()
+            // (MifareReadStep does so via EqualsBuilder).
+            @SuppressLint("DiffUtilEquals")
             @Override
             public boolean areContentsTheSame(T oldItem, T newItem) {
                 return oldItem.getContents().equals(newItem.getContents());

@@ -21,7 +21,7 @@ package com.bugfuzz.android.projectwalrus.card.carddata.ui.component;
 
 import android.content.Context;
 import android.os.Bundle;
-import android.support.annotation.CallSuper;
+import androidx.annotation.CallSuper;
 
 import java.util.HashSet;
 import java.util.List;

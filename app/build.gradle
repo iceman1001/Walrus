@@ -19,25 +19,40 @@
 
 apply plugin: 'com.android.application'
 
+// The Google Maps API key is not committed; it lives in local.properties.
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
 android {
-    compileSdkVersion 27
+    namespace 'com.bugfuzz.android.projectwalrus'
+
+    compileSdk 35
+
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_7
-        targetCompatibility JavaVersion.VERSION_1_7
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
+
     defaultConfig {
         applicationId "com.bugfuzz.android.projectwalrus"
-        minSdkVersion 19
-        targetSdkVersion 27
+        minSdk 21
+        targetSdk 35
         versionCode 4
         versionName "0.2.1"
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         resValue "string", "google_maps_key",
-                (project.findProperty("GOOGLE_MAPS_API_KEY") ?: "")
+                (localProperties.getProperty("GOOGLE_MAPS_API_KEY")
+                        ?: project.findProperty("GOOGLE_MAPS_API_KEY") ?: "")
     }
-    dataBinding {
-        enabled = true
+
+    buildFeatures {
+        dataBinding true
+        buildConfig true
     }
+
     if (new File("../walrus-keystore.properties").exists()) {
         def keystorePropertiesFile = rootProject.file("../walrus-keystore.properties")
         def keystoreProperties = new Properties()
@@ -52,17 +67,16 @@ android {
             }
         }
     }
+
     buildTypes {
         debug {
             applicationIdSuffix '.debug'
             versionNameSuffix '-debug'
-            minifyEnabled true
-            useProguard true
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
         release {
             minifyEnabled true
-            useProguard false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             if (new File("../walrus-keystore.properties").exists())
                 signingConfig signingConfigs.config
@@ -72,33 +86,40 @@ android {
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation 'android.arch.lifecycle:extensions:1.1.1'
-    implementation 'com.afollestad.material-dialogs:core:0.9.6.0'
-    implementation 'com.android.support.constraint:constraint-layout:1.1.2'
-    implementation 'com.android.support:appcompat-v7:27.1.1'
-    implementation 'com.android.support:cardview-v7:27.1.1'
-    implementation 'com.android.support:design:27.1.1'
-    implementation 'com.android.support:preference-v7:27.1.1'
-    implementation 'com.android.support:preference-v14:27.1.1'
-    implementation 'com.android.support:recyclerview-v7:27.1.1'
-    implementation 'com.android.support:support-annotations:27.1.1'
-    implementation 'com.github.PhilJay:MPAndroidChart:v3.0.3'
-    implementation 'com.github.felHR85:UsbSerial:4.5.1'
-    implementation 'com.google.android.gms:play-services-location:15.0.1'
-    implementation 'com.google.android.gms:play-services-maps:15.0.1'
-    implementation 'com.j256.ormlite:ormlite-android:5.0'
-    implementation 'com.j256.ormlite:ormlite-core:5.0'
-    implementation 'io.github.yavski:fab-speed-dial:1.0.6'
-    implementation 'org.apache.commons:commons-lang3:3.5'
+    // Aligns kotlin-stdlib / -jdk7 / -jdk8 so the pre-1.8 split artifacts
+    // pulled in transitively do not collide with kotlin-stdlib.
+    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.24')
+
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.fragment:fragment:1.8.5'
+    implementation 'androidx.lifecycle:lifecycle-livedata:2.8.7'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel:2.8.7'
+    implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
+    implementation 'androidx.preference:preference:1.2.1'
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'com.google.android.material:material:1.12.0'
+
+    implementation 'com.google.guava:guava:33.3.1-android'
+
+    implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
+    implementation 'com.github.felHR85:UsbSerial:6.1.0'
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
+    implementation 'com.google.android.gms:play-services-maps:19.0.0'
+    // ormlite-android 6.x bundles ormlite-core; declaring both duplicates every class.
+    implementation 'com.j256.ormlite:ormlite-android:6.1'
+    implementation 'com.leinardi.android:speed-dial:3.3.0'
+    implementation 'org.apache.commons:commons-lang3:3.17.0'
     implementation 'org.parceler:parceler-api:1.1.6'
-    implementation 'org.reflections:reflections:0.9.11'
-    implementation 'pub.devrel:easypermissions:1.1.3'
-    debugImplementation 'com.squareup.leakcanary:leakcanary-android:1.5.4'
-    releaseImplementation 'com.squareup.leakcanary:leakcanary-android-no-op:1.5.4'
-    annotationProcessor 'android.arch.lifecycle:compiler:1.1.1'
+    implementation 'pub.devrel:easypermissions:3.0.0'
+
+    debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.14'
+
     annotationProcessor 'org.parceler:parceler:1.1.6'
-    testImplementation 'junit:junit:4.12'
-    androidTestImplementation('com.android.support.test.espresso:espresso-core:2.2.2', {
-        exclude group: 'com.android.support', module: 'support-annotations'
-    })
+
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
 }

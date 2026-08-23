@@ -19,20 +19,25 @@
 
 package com.bugfuzz.android.projectwalrus.card.ui;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.UiThread;
-import android.support.v4.app.DialogFragment;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.content.LocalBroadcastManager;
-import android.support.v7.app.ActionBar;
-import android.support.v7.widget.Toolbar;
+import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.UiThread;
+import androidx.fragment.app.DialogFragment;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
 import android.util.Pair;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -63,6 +68,7 @@ import com.bugfuzz.android.projectwalrus.device.ui.PickCardDataTargetDialogFragm
 import com.bugfuzz.android.projectwalrus.device.ui.ReadCardDataOperationFragment;
 import com.bugfuzz.android.projectwalrus.device.ui.WriteOrEmulateCardDataOperationFragment;
 import com.bugfuzz.android.projectwalrus.util.UIUtils;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -85,6 +91,8 @@ public class CardActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
         PickCardDataClassDialogFragment.OnCardDataClassClickCallback,
         ReadCardDataOperationFragment.OnResultCallback, ComponentDialogFragment.OnEditedCallback,
         CardDevice.OnOperationCreatedCallback {
+
+    private static final int POST_NOTIFICATIONS_REQUEST_CODE = 100;
 
     private static final String EXTRA_MODE =
             "com.bugfuzz.android.projectwalrus.card.ui.CardActivity.EXTRA_MODE";
@@ -151,6 +159,14 @@ public class CardActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_card);
+        WindowInsetsUtils.insetContentBySystemBars(this);
+
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                handleBackPressed();
+            }
+        });
 
         Intent intent = getIntent();
 
@@ -167,6 +183,20 @@ public class CardActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
         } else {
             card = Parcels.unwrap(savedInstanceState.getParcelable("card"));
             dirty = savedInstanceState.getBoolean("dirty");
+        }
+
+        // BulkReadCardsService is a foreground service; without POST_NOTIFICATIONS its
+        // notification is silently dropped from API 33 on. Ask as soon as the user enters
+        // bulk-read mode rather than at the point the service starts, because that path
+        // finishes this activity straight away. Best-effort: the read still works if denied.
+        if (mode == Mode.EDIT_BULK_READ_CARD_TEMPLATE
+                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this,
+                        Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    POST_NOTIFICATIONS_REQUEST_CODE);
         }
 
         switch (mode) {
@@ -359,7 +389,7 @@ public class CardActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
                 return true;
 
             case android.R.id.home:
-                onBackPressed();
+                handleBackPressed();
                 return true;
 
             default:
@@ -619,8 +649,11 @@ public class CardActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
         onResult((CardData) componentSourceAndSink, callbackId);
     }
 
-    @Override
-    public void onBackPressed() {
+    /**
+     * Registered as an {@link OnBackPressedCallback} rather than overriding onBackPressed(), so
+     * that it keeps working under predictive back (targetSdk 36 turns that on by default).
+     */
+    private void handleBackPressed() {
         if (mode != Mode.VIEW && dirty) {
             new AlertDialog.Builder(this).setMessage(mode == Mode.EDIT
                     ? R.string.discard_card_changes : R.string.discard_bulk_read_changes)

@@ -21,32 +21,33 @@ package com.bugfuzz.android.projectwalrus.card.carddata.ui;
 
 import android.annotation.SuppressLint;
 import android.app.Dialog;
-import android.arch.lifecycle.Observer;
-import android.arch.lifecycle.ViewModelProviders;
-import android.databinding.DataBindingUtil;
-import android.databinding.ViewDataBinding;
+import android.content.DialogInterface;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.databinding.DataBindingUtil;
+import androidx.databinding.ViewDataBinding;
 import android.os.Bundle;
-import android.support.annotation.LayoutRes;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.app.DialogFragment;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
-import android.support.v7.widget.helper.ItemTouchHelper;
+import androidx.annotation.LayoutRes;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.DialogFragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
-import com.afollestad.materialdialogs.DialogAction;
-import com.afollestad.materialdialogs.MaterialDialog;
 import com.bugfuzz.android.projectwalrus.BR;
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.carddata.MifareReadStep;
 import com.bugfuzz.android.projectwalrus.databinding.MifareReadSetupDialogBinding;
 import com.bugfuzz.android.projectwalrus.databinding.MifareReadSetupDialogReadStepItemBinding;
 import com.bugfuzz.android.projectwalrus.ui.SimpleBindingListAdapter;
+import com.bugfuzz.android.projectwalrus.util.DialogUtils;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.List;
 
@@ -68,24 +69,24 @@ public class MifareReadSetupDialogFragment extends DialogFragment
     @Override
     @NonNull
     public Dialog onCreateDialog(Bundle savedInstanceState) {
-        viewModel = ViewModelProviders.of(this).get(MifareReadSetupDialogViewModel.class);
+        viewModel = new ViewModelProvider(this).get(MifareReadSetupDialogViewModel.class);
 
-        MaterialDialog dialog = new MaterialDialog.Builder(getActivity())
-                .title(R.string.setup_mifare_read)
-                .customView(R.layout.layout_mifare_read_setup_dialog, true)
-                .positiveText(R.string.start)
-                .onPositive(new MaterialDialog.SingleButtonCallback() {
+        View customView = DialogUtils.inflateCustomView(requireActivity(),
+                R.layout.layout_mifare_read_setup_dialog);
+
+        Dialog dialog = new MaterialAlertDialogBuilder(getActivity())
+                .setTitle(R.string.setup_mifare_read)
+                .setView(DialogUtils.asCustomView(requireActivity(), customView, true))
+                .setPositiveButton(R.string.start, new DialogInterface.OnClickListener() {
                     @Override
-                    public void onClick(@NonNull MaterialDialog dialog,
-                            @NonNull DialogAction which) {
+                    public void onClick(DialogInterface dialog, int which) {
                         viewModel.onStartClick();
                     }
                 })
-                .negativeText(android.R.string.cancel)
-                .build();
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
 
-        MifareReadSetupDialogBinding binding = MifareReadSetupDialogBinding.bind(
-                dialog.getCustomView());
+        MifareReadSetupDialogBinding binding = MifareReadSetupDialogBinding.bind(customView);
         binding.setLifecycleOwner(this);
 
         binding.setViewModel(viewModel);

@@ -25,18 +25,21 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Color;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.annotation.NonNull;
-import android.support.v4.content.LocalBroadcastManager;
-import android.support.v4.view.ViewCompat;
-import android.support.v7.widget.GridLayoutManager;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
-import android.support.v7.widget.Toolbar;
+import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.core.view.ViewCompat;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.appcompat.widget.Toolbar;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -55,11 +58,12 @@ import com.bugfuzz.android.projectwalrus.card.QueryUtils;
 import com.bugfuzz.android.projectwalrus.device.ui.BulkReadCardsActivity;
 import com.bugfuzz.android.projectwalrus.device.ui.DevicesActivity;
 import com.bugfuzz.android.projectwalrus.ui.SettingsActivity;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 import java.util.List;
 
-import io.github.yavski.fabspeeddial.FabSpeedDial;
-import io.github.yavski.fabspeeddial.SimpleMenuListenerAdapter;
+import com.leinardi.android.speeddial.SpeedDialActionItem;
+import com.leinardi.android.speeddial.SpeedDialView;
 import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
 
@@ -110,6 +114,24 @@ public class WalletActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
         }
 
         setContentView(R.layout.activity_wallet);
+        WindowInsetsUtils.insetContentBySystemBars(this);
+
+        // Registered as an OnBackPressedCallback rather than overriding onBackPressed(), so that
+        // it keeps working under predictive back (targetSdk 36 turns that on by default).
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (sv.getVisibility() != View.GONE) {
+                    sv.setIconified(true);
+                    sv.setVisibility(View.GONE);
+                } else {
+                    // Hand back to whatever would have run without this callback.
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                    setEnabled(true);
+                }
+            }
+        });
 
         setSupportActionBar((Toolbar) findViewById(R.id.toolbar));
 
@@ -149,20 +171,39 @@ public class WalletActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
                     }
                 });
 
-        FabSpeedDial fabSpeedDial = findViewById(R.id.floatingActionButton);
-        fabSpeedDial.setMenuListener(new SimpleMenuListenerAdapter() {
+        // Built by hand rather than with inflate(R.menu.menu_wallet_fab), because the menu
+        // carries no colours: fab-speed-dial used to draw white mini FABs with dark icons
+        // (app:miniFabBackgroundTint), and inflate() would leave white-on-default ones.
+        SpeedDialView fabSpeedDial = findViewById(R.id.floatingActionButton);
+        int miniFabBackground = Color.WHITE;
+        int miniFabIcon = ContextCompat.getColor(this, R.color.primaryDarkColor);
+        fabSpeedDial.addActionItem(
+                new SpeedDialActionItem.Builder(R.id.add_new_card,
+                        R.drawable.ic_add_box_white_24px)
+                        .setLabel(R.string.add_new_card)
+                        .setFabBackgroundColor(miniFabBackground)
+                        .setFabImageTintColor(miniFabIcon)
+                        .create());
+        fabSpeedDial.addActionItem(
+                new SpeedDialActionItem.Builder(R.id.bulk_read_cards,
+                        R.drawable.ic_library_add_white_24px)
+                        .setLabel(R.string.bulk_read_cards)
+                        .setFabBackgroundColor(miniFabBackground)
+                        .setFabImageTintColor(miniFabIcon)
+                        .create());
+        fabSpeedDial.setOnActionSelectedListener(new SpeedDialView.OnActionSelectedListener() {
             @Override
-            public boolean onMenuItemSelected(MenuItem menuItem) {
-                switch (menuItem.getItemId()) {
+            public boolean onActionSelected(SpeedDialActionItem actionItem) {
+                switch (actionItem.getId()) {
                     case R.id.add_new_card:
                         CardActivity.startActivity(WalletActivity.this,
                                 CardActivity.Mode.EDIT, null, null);
-                        return true;
+                        return false;
 
                     case R.id.bulk_read_cards:
                         CardActivity.startActivity(WalletActivity.this,
                                 CardActivity.Mode.EDIT_BULK_READ_CARD_TEMPLATE, null, null);
-                        return true;
+                        return false;
                 }
 
                 return false;
@@ -172,18 +213,36 @@ public class WalletActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
         LocalBroadcastManager.getInstance(this).registerReceiver(walletUpdateBroadcastReceiver,
                 new IntentFilter(QueryUtils.ACTION_WALLET_UPDATE));
 
-        if (EasyPermissions.hasPermissions(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
+        // API 31+ lets the user grant approximate location only, so ask for both and accept
+        // either: WalrusApplication just records whatever the fused provider gives it.
+        if (EasyPermissions.hasPermissions(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                || EasyPermissions.hasPermissions(this,
+                        Manifest.permission.ACCESS_FINE_LOCATION)) {
             gotLocationPermissions();
         } else {
             EasyPermissions.requestPermissions(this, getString(R.string.location_rationale),
-                    LOCATION_REQUEST_CODE, Manifest.permission.ACCESS_FINE_LOCATION);
+                    LOCATION_REQUEST_CODE, Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION);
         }
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
             @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
         EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
+
+        // An approximate-only grant (COARSE yes, FINE no) is possible from API 31 on. It does
+        // not fire @AfterPermissionGranted, because not every requested permission was granted,
+        // but it is still enough to stamp cards with a location.
+        if (requestCode == LOCATION_REQUEST_CODE
+                && !EasyPermissions.hasPermissions(this,
+                        Manifest.permission.ACCESS_FINE_LOCATION)
+                && EasyPermissions.hasPermissions(this,
+                        Manifest.permission.ACCESS_COARSE_LOCATION)) {
+            gotLocationPermissions();
+        }
     }
 
     @AfterPermissionGranted(LOCATION_REQUEST_CODE)
@@ -222,15 +281,6 @@ public class WalletActivity extends OrmLiteBaseAppCompatActivity<DatabaseHelper>
         }
     }
 
-    @Override
-    public void onBackPressed() {
-        if (sv.getVisibility() != View.GONE) {
-            sv.setIconified(true);
-            sv.setVisibility(View.GONE);
-        } else {
-            super.onBackPressed();
-        }
-    }
 
     @Override
     protected void onDestroy() {

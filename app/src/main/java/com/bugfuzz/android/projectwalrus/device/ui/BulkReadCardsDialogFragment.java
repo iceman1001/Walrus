@@ -23,20 +23,20 @@ import android.app.Dialog;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.support.annotation.NonNull;
-import android.support.v4.app.DialogFragment;
-import android.support.v4.content.LocalBroadcastManager;
+import androidx.annotation.NonNull;
+import androidx.fragment.app.DialogFragment;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.afollestad.materialdialogs.DialogAction;
-import com.afollestad.materialdialogs.MaterialDialog;
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.device.BulkReadCardDataOperationRunner;
 import com.bugfuzz.android.projectwalrus.device.BulkReadCardsService;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class BulkReadCardsDialogFragment extends DialogFragment {
 
@@ -109,21 +109,20 @@ public class BulkReadCardsDialogFragment extends DialogFragment {
         cardDataIOView = new CardDataIOView(getActivity());
         cardDataIOView.setDirection(true);
 
-        return new MaterialDialog.Builder(getActivity())
-                .title(R.string.bulk_reading_cards)
-                .customView(cardDataIOView, false)
-                .positiveText(R.string.stop_button)
-                .onPositive(new MaterialDialog.SingleButtonCallback() {
-                    @Override
-                    public void onClick(@NonNull MaterialDialog dialog,
-                            @NonNull DialogAction which) {
-                        BulkReadCardDataOperationRunner runner = getRunner();
-                        if (runner != null) {
-                            runner.stopReading();
-                        }
-                    }
-                })
-                .build();
+        return new MaterialAlertDialogBuilder(getActivity())
+                .setTitle(R.string.bulk_reading_cards)
+                .setView(cardDataIOView)
+                .setPositiveButton(R.string.stop_button,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                BulkReadCardDataOperationRunner runner = getRunner();
+                                if (runner != null) {
+                                    runner.stopReading();
+                                }
+                            }
+                        })
+                .create();
     }
 
     @Override

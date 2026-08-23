@@ -22,12 +22,14 @@ package com.bugfuzz.android.projectwalrus.card.carddata.ui;
 import android.app.Dialog;
 import android.content.Context;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v4.app.DialogFragment;
+import androidx.annotation.NonNull;
+import androidx.fragment.app.DialogFragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
-import com.afollestad.materialdialogs.MaterialDialog;
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.carddata.CardData;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -80,10 +82,15 @@ public class PickCardDataClassDialogFragment extends DialogFragment
             }
         }
 
-        return new MaterialDialog.Builder(getActivity())
-                .title(R.string.choose_card_type)
-                .adapter(new CardDataClassAdapter(this, cardDataClasses, 16), null)
-                .build();
+        // material-dialogs' adapter() built the RecyclerView for us; do it by hand.
+        RecyclerView list = new RecyclerView(requireActivity());
+        list.setLayoutManager(new LinearLayoutManager(getActivity()));
+        list.setAdapter(new CardDataClassAdapter(this, cardDataClasses, 16));
+
+        return new MaterialAlertDialogBuilder(getActivity())
+                .setTitle(R.string.choose_card_type)
+                .setView(list)
+                .create();
     }
 
     @Override

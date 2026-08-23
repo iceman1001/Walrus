@@ -20,23 +20,26 @@
 package com.bugfuzz.android.projectwalrus.card.carddata.ui.component;
 
 import android.app.Dialog;
-import android.arch.lifecycle.ViewModelProviders;
+import android.content.DialogInterface;
+import androidx.lifecycle.ViewModelProvider;
 import android.os.Bundle;
-import android.support.annotation.Keep;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.app.DialogFragment;
-import android.support.v4.content.ContextCompat;
+import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.DialogFragment;
+import androidx.core.content.ContextCompat;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import com.afollestad.materialdialogs.DialogAction;
-import com.afollestad.materialdialogs.MaterialDialog;
 import com.bugfuzz.android.projectwalrus.R;
+import com.bugfuzz.android.projectwalrus.util.DialogUtils;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.parceler.Parcels;
 
@@ -51,6 +54,8 @@ public class ComponentDialogFragment extends DialogFragment
 
     private LinearLayout problemViewGroup;
 
+    private View customView;
+
     @Keep
     public ComponentDialogFragment() {
     }
@@ -61,7 +66,7 @@ public class ComponentDialogFragment extends DialogFragment
 
         ComponentSourceAndSink componentSourceAndSink = Parcels.unwrap(getArguments().getParcelable(
                 "source_and_sink"));
-        viewModel = ViewModelProviders.of(this,
+        viewModel = new ViewModelProvider(this,
                 new ComponentViewModel.Factory(componentSourceAndSink)).get(
                         ComponentViewModel.class);
     }
@@ -71,32 +76,35 @@ public class ComponentDialogFragment extends DialogFragment
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         boolean editable = getArguments().getBoolean("editable");
 
-        MaterialDialog.Builder builder = new MaterialDialog.Builder(getActivity())
-                .title(getArguments().getString("title"))
-                .customView(R.layout.dialog_component_dialog, true);
+        customView = DialogUtils.inflateCustomView(requireActivity(),
+                R.layout.dialog_component_dialog);
+
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(getActivity())
+                .setTitle(getArguments().getString("title"))
+                .setView(DialogUtils.asCustomView(requireActivity(), customView, true));
 
         if (editable) {
             builder
-                    .positiveText(android.R.string.ok)
-                    .onPositive(new MaterialDialog.SingleButtonCallback() {
-                        @Override
-                        public void onClick(@NonNull MaterialDialog dialog,
-                                @NonNull DialogAction which) {
-                            viewModel.getComponentSourceAndSink().applyComponent(component);
+                    .setPositiveButton(android.R.string.ok,
+                            new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    viewModel.getComponentSourceAndSink().applyComponent(
+                                            component);
 
-                            if (getActivity() instanceof OnEditedCallback) {
-                                ((OnEditedCallback) getActivity()).onEdited(
-                                        viewModel.getComponentSourceAndSink(),
-                                        getArguments().getInt("callback_id"));
-                            }
+                                    if (getActivity() instanceof OnEditedCallback) {
+                                        ((OnEditedCallback) getActivity()).onEdited(
+                                                viewModel.getComponentSourceAndSink(),
+                                                getArguments().getInt("callback_id"));
+                                    }
 
-                            dismiss();
-                        }
-                    })
-                    .negativeText(android.R.string.cancel);
+                                    dismiss();
+                                }
+                            })
+                    .setNegativeButton(android.R.string.cancel, null);
         }
 
-        return builder.build();
+        return builder.create();
     }
 
     @Nullable
@@ -105,7 +113,7 @@ public class ComponentDialogFragment extends DialogFragment
             @Nullable Bundle savedInstanceState) {
         final View result = super.onCreateView(inflater, container, savedInstanceState);
 
-        ViewGroup viewGroup = (ViewGroup) ((MaterialDialog) getDialog()).getCustomView();
+        ViewGroup viewGroup = (ViewGroup) customView;
         assert viewGroup != null;
 
         component = viewModel.getComponentSourceAndSink().createComponent(getActivity(),
@@ -128,11 +136,33 @@ public class ComponentDialogFragment extends DialogFragment
     }
 
     @Override
-    public void onComponentChange(Component changedComponent) {
-        if (getArguments().getBoolean("editable")) {
-            ((MaterialDialog) getDialog()).getActionButton(DialogAction.POSITIVE).setEnabled(
-                    component.isValid());
+    public void onStart() {
+        super.onStart();
+
+        // The buttons of an AlertDialog only exist once it has been shown, unlike
+        // material-dialogs' getActionButton().
+        updatePositiveButton();
+    }
+
+    private void updatePositiveButton() {
+        if (!getArguments().getBoolean("editable") || component == null) {
+            return;
         }
+
+        Dialog dialog = getDialog();
+        if (!(dialog instanceof AlertDialog)) {
+            return;
+        }
+
+        Button button = ((AlertDialog) dialog).getButton(DialogInterface.BUTTON_POSITIVE);
+        if (button != null) {
+            button.setEnabled(component.isValid());
+        }
+    }
+
+    @Override
+    public void onComponentChange(Component changedComponent) {
+        updatePositiveButton();
 
         problemViewGroup.removeAllViews();
 

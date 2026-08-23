@@ -20,7 +20,7 @@
 package com.bugfuzz.android.projectwalrus.card.carddata.ui.component;
 
 import android.content.Context;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.LinearLayout;

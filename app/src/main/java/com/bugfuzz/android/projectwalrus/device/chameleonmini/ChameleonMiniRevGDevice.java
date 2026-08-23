@@ -23,24 +23,22 @@ import android.content.Context;
 import android.content.Intent;
 import android.hardware.usb.UsbDevice;
 import android.preference.PreferenceManager;
-import android.support.annotation.Keep;
-import android.support.annotation.UiThread;
-import android.support.annotation.WorkerThread;
-import android.support.v7.app.AppCompatActivity;
+import androidx.annotation.Keep;
+import androidx.annotation.UiThread;
+import androidx.annotation.WorkerThread;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.carddata.CardData;
 import com.bugfuzz.android.projectwalrus.card.carddata.ISO14443ACardData;
 import com.bugfuzz.android.projectwalrus.card.carddata.MifareCardData;
 import com.bugfuzz.android.projectwalrus.device.CardDevice;
-import com.bugfuzz.android.projectwalrus.device.LineBasedUsbSerialCardDevice;
+import com.bugfuzz.android.projectwalrus.device.LineBasedSerialCardDevice;
+import com.bugfuzz.android.projectwalrus.device.UsbSerialTransport;
 import com.bugfuzz.android.projectwalrus.device.ReadCardDataOperation;
-import com.bugfuzz.android.projectwalrus.device.UsbCardDevice;
 import com.bugfuzz.android.projectwalrus.device.WriteOrEmulateCardDataOperation;
 import com.bugfuzz.android.projectwalrus.device.chameleonmini.ui.ChameleonMiniRevGActivity;
 import com.bugfuzz.android.projectwalrus.util.MiscUtils;
-import com.felhr.usbserial.UsbSerialDevice;
-import com.felhr.usbserial.UsbSerialInterface;
 import com.google.common.primitives.Bytes;
 
 import java.io.IOException;
@@ -55,26 +53,18 @@ import java.util.logging.Logger;
         supportsWrite = {},
         supportsEmulate = {MifareCardData.class}
 )
-@UsbCardDevice.UsbIds({@UsbCardDevice.UsbIds.Ids(vendorId = 0x16d0, productId = 0x4b2)})
-public class ChameleonMiniRevGDevice extends LineBasedUsbSerialCardDevice
+@CardDevice.UsbIds({@CardDevice.UsbIds.Ids(vendorId = 0x16d0, productId = 0x4b2)})
+public class ChameleonMiniRevGDevice extends LineBasedSerialCardDevice
         implements CardDevice.Versioned {
+
+    private static final int BAUD_RATE = 115200;
 
     private final Semaphore semaphore = new Semaphore(1);
 
     @Keep
     public ChameleonMiniRevGDevice(Context context, UsbDevice usbDevice) throws IOException {
-        super(context, usbDevice, "\r\n", "ISO-8859-1", context.getString(R.string.idle));
-    }
-
-    @Override
-    protected void setupSerialParams(UsbSerialDevice usbSerialDevice) {
-        usbSerialDevice.setBaudRate(115200);
-
-        usbSerialDevice.setDataBits(UsbSerialInterface.DATA_BITS_8);
-        usbSerialDevice.setParity(UsbSerialInterface.PARITY_NONE);
-        usbSerialDevice.setStopBits(UsbSerialInterface.STOP_BITS_1);
-
-        usbSerialDevice.setFlowControl(UsbSerialInterface.FLOW_CONTROL_OFF);
+        super(context, new UsbSerialTransport(context, usbDevice, BAUD_RATE), "\r\n",
+                "ISO-8859-1", context.getString(R.string.idle));
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")

@@ -20,19 +20,22 @@
 package com.bugfuzz.android.projectwalrus.ui;
 
 import android.os.Bundle;
-import android.support.v4.app.DialogFragment;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.preference.Preference;
-import android.support.v7.preference.PreferenceFragmentCompat;
+import androidx.fragment.app.DialogFragment;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceFragmentCompat;
 
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.ui.DeleteAllCardsPreference;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 public class SettingsActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        WindowInsetsUtils.insetContentBySystemBars(this);
 
         getSupportFragmentManager().beginTransaction()
                 .replace(android.R.id.content, new SettingsFragment())
@@ -44,6 +47,17 @@ public class SettingsActivity extends AppCompatActivity {
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             addPreferencesFromResource(R.xml.preferences);
+        }
+
+        @Override
+        public boolean onPreferenceTreeClick(Preference preference) {
+            if ("open_source_licenses".equals(preference.getKey())) {
+                startActivity(WebViewActivity.getStartActivityIntent(requireContext(),
+                        "file:///android_asset/open_source.html"));
+                return true;
+            }
+
+            return super.onPreferenceTreeClick(preference);
         }
 
         @Override

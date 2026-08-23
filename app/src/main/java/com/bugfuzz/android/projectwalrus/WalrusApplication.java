@@ -30,14 +30,13 @@ import android.location.Location;
 import android.os.Build;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
-import android.support.v4.content.LocalBroadcastManager;
-import android.support.v7.preference.PreferenceManager;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.preference.PreferenceManager;
 import android.widget.Toast;
 
 import com.bugfuzz.android.projectwalrus.card.carddata.HIDCardData;
 import com.bugfuzz.android.projectwalrus.device.CardDevice;
 import com.bugfuzz.android.projectwalrus.device.CardDeviceManager;
-import com.bugfuzz.android.projectwalrus.device.UsbCardDevice;
 import com.bugfuzz.android.projectwalrus.util.GeoUtils;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -45,7 +44,6 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.squareup.leakcanary.LeakCanary;
 
 public class WalrusApplication extends Application {
 
@@ -105,10 +103,8 @@ public class WalrusApplication extends Application {
     public void onCreate() {
         super.onCreate();
 
-        if (LeakCanary.isInAnalyzerProcess(this)) {
-            return;
-        }
-        LeakCanary.install(this);
+        // LeakCanary 2.x installs itself via a ContentProvider; no manual install needed,
+        // and it is a debugImplementation-only dependency now.
 
         context = getApplicationContext();
 
@@ -149,7 +145,7 @@ public class WalrusApplication extends Application {
                 }
 
                 toast = getString(R.string.device_connected,
-                        cardDevice.getClass().getAnnotation(UsbCardDevice.Metadata.class).name());
+                        cardDevice.getClass().getAnnotation(CardDevice.Metadata.class).name());
 
                 timings = new long[]{200, 200, 200, 200, 200};
                 amplitudes = new int[]{255, 0, 255, 0, 255};

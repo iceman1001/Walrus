@@ -20,8 +20,8 @@
 package com.bugfuzz.android.projectwalrus.device;
 
 import android.content.Context;
-import android.support.annotation.StringRes;
-import android.support.annotation.WorkerThread;
+import androidx.annotation.StringRes;
+import androidx.annotation.WorkerThread;
 
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.carddata.CardData;

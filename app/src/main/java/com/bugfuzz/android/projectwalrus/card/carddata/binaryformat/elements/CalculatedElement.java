@@ -20,7 +20,7 @@
 package com.bugfuzz.android.projectwalrus.card.carddata.binaryformat.elements;
 
 import android.content.Context;
-import android.support.annotation.StringRes;
+import androidx.annotation.StringRes;
 
 import com.bugfuzz.android.projectwalrus.WalrusApplication;
 import com.bugfuzz.android.projectwalrus.card.carddata.binaryformat.BinaryFormat;

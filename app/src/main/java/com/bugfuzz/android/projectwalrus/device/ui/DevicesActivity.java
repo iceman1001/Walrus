@@ -23,17 +23,21 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.annotation.SuppressLint;
 import android.os.Bundle;
-import android.support.v4.content.LocalBroadcastManager;
-import android.support.v7.app.ActionBar;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.RecyclerView;
-import android.support.v7.widget.Toolbar;
+import android.view.Menu;
+import android.view.MenuItem;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.appcompat.widget.Toolbar;
 import android.widget.Toast;
 
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.device.CardDevice;
 import com.bugfuzz.android.projectwalrus.device.CardDeviceManager;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 public class DevicesActivity extends AppCompatActivity
         implements CardDeviceAdapter.OnCardDeviceClickCallback {
@@ -48,10 +52,15 @@ public class DevicesActivity extends AppCompatActivity
     };
 
     @Override
+    // InvalidSetHasFixedSize is a false positive here: lint resolves @id/card_device_list to the
+    // wrap_content copy in dialog_pick_card_data_target.xml. The one this activity inflates
+    // (activity_devices.xml) is match_parent.
+    @SuppressLint("InvalidSetHasFixedSize")
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_devices);
+        WindowInsetsUtils.insetContentBySystemBars(this);
 
         setSupportActionBar((Toolbar) findViewById(R.id.toolbar));
 
@@ -66,6 +75,22 @@ public class DevicesActivity extends AppCompatActivity
     }
 
     @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_devices, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.connect_bluetooth_device) {
+            startActivity(new Intent(this, BluetoothDevicesActivity.class));
+            return true;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
 
@@ -73,6 +98,11 @@ public class DevicesActivity extends AppCompatActivity
         intentFilter.addAction(CardDevice.ACTION_STATUS_UPDATE);
         LocalBroadcastManager.getInstance(this).registerReceiver(deviceUpdateBroadcastReceiver,
                 intentFilter);
+
+        // A device can be added while this activity is paused - connecting over Bluetooth is done
+        // from an activity stacked on top of this one - and the broadcast is missed, so re-read
+        // the list on the way back in.
+        adapter.notifyDataSetChanged();
     }
 
     @Override

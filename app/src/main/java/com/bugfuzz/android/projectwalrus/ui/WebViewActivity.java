@@ -19,15 +19,29 @@
 
 package com.bugfuzz.android.projectwalrus.ui;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.webkit.WebView;
+
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 public class WebViewActivity extends AppCompatActivity {
 
     private static final String EXTRA_URL =
             "com.bugfuzz.android.projectwalrus.ui.WebViewActivity.EXTRA_URL";
+
+    /**
+     * This used to be reached from @xml/preferences with an implicit intent on a made-up action.
+     * Android 14 stopped delivering implicit intents to components that are not exported, so it
+     * has to be explicit now.
+     */
+    public static Intent getStartActivityIntent(Context context, String url) {
+        Intent intent = new Intent(context, WebViewActivity.class);
+        intent.putExtra(EXTRA_URL, url);
+        return intent;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,6 +50,7 @@ public class WebViewActivity extends AppCompatActivity {
         WebView webView = new WebView(this);
 
         setContentView(webView);
+        WindowInsetsUtils.insetContentBySystemBars(this);
 
         Intent intent = getIntent();
 

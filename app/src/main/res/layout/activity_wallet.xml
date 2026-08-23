@@ -40,7 +40,7 @@
         android:visibility="gone"
         tools:ignore="UnknownIdInLayout"/>
 
-    <android.support.v7.widget.RecyclerView
+    <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -52,7 +52,7 @@
         android:paddingTop="8dp"
         android:scrollbars="vertical"/>
 
-    <io.github.yavski.fabspeeddial.FabSpeedDial
+    <com.leinardi.android.speeddial.SpeedDialView
         android:id="@+id/floatingActionButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -61,10 +61,7 @@
         android:layout_gravity="bottom|end"
         android:layout_marginBottom="16dp"
         android:layout_marginEnd="16dp"
-        app:elevation="8dp"
-        app:fabBackgroundTint="@color/secondaryColor"
-        app:fabGravity="bottom_end"
-        app:fabMenu="@menu/menu_wallet_fab"
-        app:miniFabBackgroundTint="@android:color/white"/>
+        app:sdMainFabClosedBackgroundColor="@color/secondaryColor"
+        app:sdMainFabClosedSrc="@drawable/ic_add_white_24px"/>
 
 </RelativeLayout>

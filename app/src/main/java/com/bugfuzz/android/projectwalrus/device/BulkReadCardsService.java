@@ -27,12 +27,14 @@ import android.app.Service;
 import android.app.TaskStackBuilder;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.content.LocalBroadcastManager;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.ServiceCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.bugfuzz.android.projectwalrus.R;
 import com.bugfuzz.android.projectwalrus.card.Card;
@@ -122,7 +124,11 @@ public class BulkReadCardsService extends Service {
         LocalBroadcastManager.getInstance(BulkReadCardsService.this)
                 .sendBroadcast(new Intent(ACTION_UPDATE));
 
-        startForeground(NOTIFICATION_ID, getNotification());
+        // API 34+ requires the type to be passed to startForeground(); ServiceCompat picks
+        // the right overload. It matches android:foregroundServiceType in the manifest.
+        ServiceCompat.startForeground(this, NOTIFICATION_ID, getNotification(),
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                        ? ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE : 0);
 
         new Thread(runner).start();
     }
@@ -148,7 +154,8 @@ public class BulkReadCardsService extends Service {
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setContentIntent(TaskStackBuilder.create(this)
                         .addNextIntentWithParentStack(new Intent(this, BulkReadCardsActivity.class))
-                        .getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT));
+                        .getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT
+                                | PendingIntent.FLAG_IMMUTABLE));
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             notificationBuilder.setCategory(Notification.CATEGORY_SERVICE);
         }

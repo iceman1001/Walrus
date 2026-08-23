@@ -47,14 +47,9 @@
 
     <PreferenceCategory android:title="@string/about_settings_preference">
 
-        <Preference android:title="@string/open_source_preference">
-            <intent android:action=".ui.WebViewActivity">
-                <!--suppress AndroidElementNotAllowed -->
-                <extra
-                    android:name="com.bugfuzz.android.projectwalrus.ui.WebViewActivity.EXTRA_URL"
-                    android:value="file:///android_asset/open_source.html"/>
-            </intent>
-        </Preference>
+        <Preference
+            android:key="open_source_licenses"
+            android:title="@string/open_source_preference"/>
 
     </PreferenceCategory>
 

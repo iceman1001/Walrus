@@ -22,9 +22,9 @@ package com.bugfuzz.android.projectwalrus.device.proxmark3.ui;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import androidx.fragment.app.Fragment;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -34,6 +34,7 @@ import com.bugfuzz.android.projectwalrus.device.CardDevice;
 import com.bugfuzz.android.projectwalrus.device.CardDeviceManager;
 import com.bugfuzz.android.projectwalrus.device.proxmark3.Proxmark3Device;
 import com.bugfuzz.android.projectwalrus.device.ui.FindVersionFragment;
+import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 import java.io.IOException;
 
@@ -50,17 +51,17 @@ public class Proxmark3Activity extends AppCompatActivity
 
     public static Intent getStartActivityIntent(Context context, Proxmark3Device device) {
         Intent intent = new Intent(context, Proxmark3Activity.class);
-
         intent.putExtra(EXTRA_DEVICE, device.getId());
-
         return intent;
     }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_proxmark3);
+        WindowInsetsUtils.insetContentBySystemBars(this);
 
         CardDevice cardDevice = CardDeviceManager.INSTANCE.getCardDevices().get(
                 getIntent().getIntExtra(EXTRA_DEVICE, -1));
@@ -93,12 +94,23 @@ public class Proxmark3Activity extends AppCompatActivity
                 exception.getMessage()));
     }
 
+    /**
+     * The two band buttons run the continuous measurement, which is what the client's
+     * {@code lf tune} and {@code hf tune} do. The sweep that draws a resonance curve is
+     * {@code hw tune}, and lives behind its own button.
+     */
     public void onTuneLFClick(View view) {
-        tune(true);
+        startActivity(Proxmark3LiveTuneActivity.getStartActivityIntent(this, proxmark3Device,
+                true));
     }
 
     public void onTuneHFClick(View view) {
-        tune(false);
+        startActivity(Proxmark3LiveTuneActivity.getStartActivityIntent(this, proxmark3Device,
+                false));
+    }
+
+    public void onSweepClick(View view) {
+        tune(true);
     }
 
     private void tune(boolean lf) {

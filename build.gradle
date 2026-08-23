@@ -17,26 +17,10 @@
  * along with Walrus.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-buildscript {
-    repositories {
-        google()
-        jcenter()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:3.3.2'
-    }
-}
-
-allprojects {
-    repositories {
-        google()
-        jcenter()
-        maven {
-            url "https://jitpack.io"
-        }
-    }
+plugins {
+    id 'com.android.application' version '8.7.3' apply false
 }
 
 task clean(type: Delete) {
-    delete rootProject.buildDir
+    delete rootProject.layout.buildDirectory
 }

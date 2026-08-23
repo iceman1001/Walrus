@@ -21,8 +21,8 @@ package com.bugfuzz.android.projectwalrus.card.carddata.binaryformat.elements;
 
 import android.content.Context;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.annotation.StringRes;
+import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import android.text.InputType;
 import android.util.TypedValue;
 import android.view.View;

@@ -19,17 +19,41 @@
   -->
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          xmlns:tools="http://schemas.android.com/tools"
-          package="com.bugfuzz.android.projectwalrus">
+          xmlns:tools="http://schemas.android.com/tools">
 
     <uses-feature android:name="android.hardware.usb.host"/>
 
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+
+    <!-- BulkReadCardsService runs in the foreground while a reader is attached. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
+    <!-- API 33+: needed for that service's own notification to be shown. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!--
+      The Proxmark3's Blue Shark add-on is a Bluetooth Classic (RFCOMM/SPP) module. BLUETOOTH and
+      BLUETOOTH_ADMIN are the pre-API-31 spelling of the two runtime permissions below them.
+      -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30"/>
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s"/>
 
     <application
         android:name=".WalrusApplication"
         android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_descriptor"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -44,7 +68,10 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="@string/google_maps_key"/>
 
-        <receiver android:name=".device.CardDeviceManager$UsbBroadcastReceiver">
+        <!-- Receives system USB attach/detach broadcasts, so it must be exported. -->
+        <receiver
+            android:name=".device.CardDeviceManager$UsbBroadcastReceiver"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"/>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_DETACHED"/>
@@ -61,11 +88,13 @@
 
         <service
             android:name=".device.BulkReadCardsService"
-            android:exported="false">
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice">
         </service>
 
         <activity
             android:name=".card.ui.WalletActivity"
+            android:exported="true"
             android:theme="@style/App.WithTransitions.LauncherActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -73,52 +102,69 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".card.ui.CardActivity"/>
+        <activity
+            android:name=".card.ui.CardActivity"
+            android:exported="false"/>
 
         <activity
             android:name=".device.ui.BulkReadCardsActivity"
+            android:exported="false"
             android:label="@string/bulk_read_cards_activity_name"
             android:parentActivityName=".card.ui.WalletActivity"/>
 
         <activity
+            android:name=".device.ui.BluetoothDevicesActivity"
+            android:exported="false"
+            android:label="@string/bluetooth_devices_activity_name"
+            android:parentActivityName=".device.ui.DevicesActivity"/>
+
+        <activity
             android:name=".device.ui.DevicesActivity"
+            android:exported="false"
             android:label="@string/devices_activity_name"
             android:parentActivityName=".card.ui.WalletActivity"/>
 
         <activity
             android:name=".device.proxmark3.ui.Proxmark3Activity"
+            android:exported="false"
             android:label="@string/proxmark3_activity_name"
             android:parentActivityName=".device.ui.DevicesActivity"/>
 
         <activity
+            android:name=".device.proxmark3.ui.Proxmark3LiveTuneActivity"
+            android:exported="false"
+            android:label="@string/live_tune_activity_name"
+            android:parentActivityName=".device.proxmark3.ui.Proxmark3Activity"/>
+
+        <activity
             android:name=".device.proxmark3.ui.Proxmark3TuneResultActivity"
+            android:exported="false"
             android:label="@string/proxmark3_tune_result_activity_name"
             android:parentActivityName=".device.proxmark3.ui.Proxmark3Activity"/>
 
         <activity
             android:name=".device.chameleonmini.ui.ChameleonMiniRevGActivity"
+            android:exported="false"
             android:label="@string/chameleon_mini_rev_g_activity_name"
             android:parentActivityName=".device.ui.DevicesActivity"/>
 
         <activity
             android:name=".device.chameleonmini.ui.ChameleonMiniRevERebootedActivity"
+            android:exported="false"
             android:label="@string/chameleon_mini_rev_e_rebooted_activity_name"
             android:parentActivityName=".device.ui.DevicesActivity"/>
 
         <activity
             android:name=".ui.SettingsActivity"
+            android:exported="false"
             android:label="@string/settings_activity_name"
             android:parentActivityName=".card.ui.WalletActivity"
             android:theme="@style/AppPreference.SettingActivity"/>
 
+        <!-- Started explicitly by WebViewActivity.getStartActivityIntent(). -->
         <activity
             android:name=".ui.WebViewActivity"
-            android:exported="false">
-            <intent-filter>
-                <action android:name=".ui.WebViewActivity"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-            </intent-filter>
-        </activity>
+            android:exported="false"/>
 
     </application>
 

@@ -20,7 +20,7 @@
 package com.bugfuzz.android.projectwalrus.card.carddata.binaryformat;
 
 import android.content.Context;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 
 import com.bugfuzz.android.projectwalrus.card.carddata.ui.component.Component;
 import com.bugfuzz.android.projectwalrus.card.carddata.ui.component.MultiComponent;
