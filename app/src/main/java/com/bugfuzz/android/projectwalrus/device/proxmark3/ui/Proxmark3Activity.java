@@ -1,5 +1,6 @@
 /*
  * Copyright 2018 Daniel Underhay & Matthew Daley.
+ * Copyright 2026 Iceman
  *
  * This file is part of Walrus.
  *
@@ -21,7 +22,9 @@ package com.bugfuzz.android.projectwalrus.device.proxmark3.ui;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.util.Log;
 import androidx.fragment.app.Fragment;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
@@ -37,6 +40,7 @@ import com.bugfuzz.android.projectwalrus.device.ui.FindVersionFragment;
 import com.bugfuzz.android.projectwalrus.util.WindowInsetsUtils;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 
 public class Proxmark3Activity extends AppCompatActivity
         implements FindVersionFragment.OnFindVersionCallback,
@@ -46,6 +50,8 @@ public class Proxmark3Activity extends AppCompatActivity
             "com.bugfuzz.android.projectwalrus.device.proxmark3.Proxmark3Activity.EXTRA_DEVICE";
 
     private static final String PROXMARK3_TUNE_DIALOG_FRAGMENT_TAG = "proxmark3_tune_dialog";
+
+    private static final String TAG = "Proxmark3Activity";
 
     private Proxmark3Device proxmark3Device;
 
@@ -86,6 +92,10 @@ public class Proxmark3Activity extends AppCompatActivity
     @Override
     public void onVersionResult(String version) {
         ((TextView) findViewById(R.id.version)).setText(version);
+
+        // Only once the version is in: both go through the device's single-operation lock, so
+        // asking for them at the same time would just fail as "device is busy".
+        new FindCapabilitiesTask(proxmark3Device).execute();
     }
 
     @Override
@@ -144,5 +154,38 @@ public class Proxmark3Activity extends AppCompatActivity
 
         Toast.makeText(this, getString(R.string.failed_to_tune, exception.getMessage()),
                 Toast.LENGTH_LONG).show();
+    }
+
+    /**
+     * Warms the device's capabilities cache, which is what tells a Proxmark3 from a Proxmark5 and
+     * what says which of LF and HF this particular firmware was built with.
+     *
+     * <p>Nothing is shown for it yet; for now the point is to have it fetched and logged by the
+     * time anything wants to ask. Failures are not worth reporting to the user, since the device
+     * falls back to a conservative set of assumptions on its own.
+     */
+    private static class FindCapabilitiesTask extends AsyncTask<Void, Void, Void> {
+
+        private final WeakReference<Proxmark3Device> proxmark3DeviceWeakReference;
+
+        FindCapabilitiesTask(Proxmark3Device proxmark3Device) {
+            this.proxmark3DeviceWeakReference = new WeakReference<>(proxmark3Device);
+        }
+
+        @Override
+        protected Void doInBackground(Void... params) {
+            Proxmark3Device proxmark3Device = proxmark3DeviceWeakReference.get();
+            if (proxmark3Device == null) {
+                return null;
+            }
+
+            try {
+                proxmark3Device.getCapabilities();
+            } catch (IOException exception) {
+                Log.d(TAG, "Failed to get capabilities", exception);
+            }
+
+            return null;
+        }
     }
 }

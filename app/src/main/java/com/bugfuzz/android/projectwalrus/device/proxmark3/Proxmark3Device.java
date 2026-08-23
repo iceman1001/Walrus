@@ -1,5 +1,6 @@
 /*
  * Copyright 2018 Daniel Underhay & Matthew Daley.
+ * Copyright 2026 Iceman
  *
  * This file is part of Walrus.
  *
@@ -23,6 +24,7 @@ import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.usb.UsbDevice;
+import android.util.Log;
 import android.util.Pair;
 
 import androidx.annotation.Keep;
@@ -46,8 +48,6 @@ import com.bugfuzz.android.projectwalrus.device.SerialCardDevice;
 import com.bugfuzz.android.projectwalrus.device.UsbSerialTransport;
 import com.bugfuzz.android.projectwalrus.device.WriteOrEmulateCardDataOperation;
 import com.bugfuzz.android.projectwalrus.device.proxmark3.ui.Proxmark3Activity;
-import com.bugfuzz.android.projectwalrus.util.MiscUtils;
-
 import org.apache.commons.lang3.ArrayUtils;
 import org.parceler.Parcel;
 import org.parceler.ParcelConstructor;
@@ -89,7 +89,15 @@ import java.util.regex.Pattern;
 public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
         implements CardDevice.Versioned, MifareReadStep.BlockSource {
 
+    private static final String TAG = "Proxmark3Device";
+
     private static final long DEFAULT_TIMEOUT = 20 * 1000;
+
+    /**
+     * Firmware old enough not to know CMD_CAPABILITIES never answers it, so this must not be the
+     * usual 20s. The desktop client allows 1s (client/src/comms.c); allow a little more for BT.
+     */
+    private static final long CAPABILITIES_TIMEOUT = 3 * 1000;
 
     /** The client allows 1s per live sample; be a little more forgiving over BT. */
     private static final long LIVE_TUNE_TIMEOUT = 3 * 1000;
@@ -109,6 +117,10 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
     private static final Pattern TAG_ID = Pattern.compile("TAG ID: ([0-9a-fA-F]+)");
 
     private final Semaphore semaphore = new Semaphore(1);
+
+    /** Fetched once by {@link #getCapabilities()} and kept for the life of the connection. */
+    @Nullable
+    private volatile Pm3Capabilities capabilities;
 
     @Keep
     public Proxmark3Device(Context context, UsbDevice usbDevice) throws IOException {
@@ -231,15 +243,14 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
     @Override
     public MifareCardData.Block readMifareBlock(int blockNumber, MifareCardData.Key key,
             MifareCardData.KeySlot keySlot) throws IOException {
-        // mf_readblock_t: uint8 blockno, uint8 keytype, uint8 key[6].
-        ByteBuffer payload = ByteBuffer.allocate(8);
-        payload.order(ByteOrder.LITTLE_ENDIAN);
-        payload.put((byte) blockNumber);
-        payload.put((byte) (keySlot == MifareCardData.KeySlot.A ? 0 : 1));
-        payload.put(ArrayUtils.subarray(key.key, 0, 6));
+        byte[] payload = Pm3MfReadBlock.toBytes(blockNumber,
+                keySlot == MifareCardData.KeySlot.A
+                        ? Pm3MfReadBlock.KEY_TYPE_A
+                        : Pm3MfReadBlock.KEY_TYPE_B,
+                key.key);
 
         Pair<Boolean, MifareCardData.Block> result = sendThenReceiveCommands(
-                Proxmark3CommandNG.ng(Proxmark3CommandNG.HF_MIFARE_READBL, payload.array()),
+                Proxmark3CommandNG.ng(Proxmark3CommandNG.HF_MIFARE_READBL, payload),
                 new ReceiveSink<Proxmark3CommandNG, Pair<Boolean, MifareCardData.Block>>() {
                     @Override
                     public Pair<Boolean, MifareCardData.Block> onReceived(
@@ -292,24 +303,57 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
                 throw new IOException(context.getString(R.string.get_version_timeout));
             }
 
-            // SendVersion() in armsrc/appmain.c replies with
-            // { uint32 id, uint32 section_size, uint32 versionstr_len, char versionstr[] }.
-            if (version.data.length < 12) {
+            Pm3VersionInfo versionInfo = Pm3VersionInfo.parse(version.data);
+            if (versionInfo == null) {
                 throw new IOException(context.getString(R.string.get_version_timeout));
             }
 
-            ByteBuffer bb = ByteBuffer.wrap(version.data);
-            bb.order(ByteOrder.LITTLE_ENDIAN);
-            bb.getInt(); // chip id
-            bb.getInt(); // section size
-            int versionStringLength = bb.getInt();
+            return versionInfo.getVersionString();
+        } finally {
+            releaseAndSetStatus();
+        }
+    }
 
-            // The length includes the terminating NUL.
-            versionStringLength = Math.max(0,
-                    Math.min(versionStringLength - 1, version.data.length - 12));
+    /**
+     * What this particular board can do, from {@link Proxmark3CommandNG#CAPABILITIES}. Fetched on
+     * first use and cached: it cannot change while the device stays connected.
+     *
+     * <p>Deliberately not fetched from the constructor, which runs on the thread that enumerated
+     * the device and must not block on a round trip.
+     *
+     * <p>Only throws if the device is busy with something else. A device that does not answer, or
+     * that answers with a struct version this build does not know, yields
+     * {@link Pm3Capabilities#baseline()} rather than an error: refusing to talk to a Proxmark3
+     * because its firmware is unfamiliar would be worse than assuming the basics.
+     */
+    public Pm3Capabilities getCapabilities() throws IOException {
+        Pm3Capabilities cached = capabilities;
+        if (cached != null) {
+            return cached;
+        }
 
-            return MiscUtils.stripAnsi(new String(
-                    ArrayUtils.subarray(version.data, 12, 12 + versionStringLength)));
+        if (!tryAcquireAndSetStatus(context.getString(R.string.getting_capabilities))) {
+            throw new IOException(context.getString(R.string.device_busy));
+        }
+
+        try {
+            Proxmark3CommandNG response = sendThenReceiveCommands(
+                    Proxmark3CommandNG.ng(Proxmark3CommandNG.CAPABILITIES),
+                    new CommandWaiter(Proxmark3CommandNG.CAPABILITIES, CAPABILITIES_TIMEOUT));
+
+            Pm3Capabilities parsed = response != null
+                    ? Pm3Capabilities.parse(response.data)
+                    : null;
+            if (parsed == null) {
+                parsed = Pm3Capabilities.baseline();
+            }
+
+            // Logged rather than shown: the flag bit ordering still wants confirming against real
+            // hardware, and this is what that check reads. See PM3-PM5-DESIGN.md section 5.
+            Log.d(TAG, "Capabilities: " + parsed);
+
+            capabilities = parsed;
+            return parsed;
         } finally {
             releaseAndSetStatus();
         }
@@ -336,39 +380,25 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
                 throw new IOException(context.getString(R.string.tune_timeout));
             }
 
-            // struct p in MeasureAntennaTuning(), armsrc/appmain.c, all in millivolts:
-            // uint32 v_lf134, v_lf125, v_lfconf, v_hf, peak_v, peak_f; int32 divisor;
-            // uint8 results[256].
-            if (result.data.length < 28 + 256) {
+            Pm3AntennaTuning tuning = Pm3AntennaTuning.parse(result.data);
+            if (tuning == null) {
                 throw new IOException(context.getString(R.string.tune_timeout));
             }
 
-            ByteBuffer bb = ByteBuffer.wrap(result.data);
-            bb.order(ByteOrder.LITTLE_ENDIAN);
-
-            float vlf134 = (bb.getInt() & 0xffffffffL) / 1e3f;
-            float vlf125 = (bb.getInt() & 0xffffffffL) / 1e3f;
-            bb.getInt(); // voltage at the configured divisor, unused here
-            float vhf = (bb.getInt() & 0xffffffffL) / 1e3f;
-            float peakV = (bb.getInt() & 0xffffffffL) / 1e3f;
-            long peakDivisor = bb.getInt() & 0xffffffffL;
-            bb.getInt(); // sampling config divisor, unused here
-
-            float[] lfVoltages = new float[256];
-            for (int i = 0; i < 256; ++i) {
-                // The firmware scales each sample down with "adcval >> 9" so that it fits in a
-                // byte for graphing; undo that to get back to millivolts, then to volts.
-                lfVoltages[i] = ((result.data[28 + i] & 0xff) << 9) / 1e3f;
+            long[] sweep = tuning.getSweepMillivolts();
+            float[] lfVoltages = new float[sweep.length];
+            for (int i = 0; i < sweep.length; ++i) {
+                lfVoltages[i] = sweep[i] / 1e3f;
             }
 
             return new TuneResult(
                     lf, hf,
                     lf ? lfVoltages : null,
-                    lf ? vlf125 : null,
-                    lf ? vlf134 : null,
-                    lf ? 12e6f / (peakDivisor + 1) : null,
-                    lf ? peakV : null,
-                    hf ? vhf : null);
+                    lf ? tuning.getVoltageLf125() / 1e3f : null,
+                    lf ? tuning.getVoltageLf134() / 1e3f : null,
+                    lf ? tuning.getPeakFrequency() : null,
+                    lf ? tuning.getPeakVoltage() / 1e3f : null,
+                    hf ? tuning.getVoltageHf() / 1e3f : null);
         } finally {
             releaseAndSetStatus();
         }
@@ -397,14 +427,14 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
                     : Proxmark3CommandNG.MEASURE_ANTENNA_TUNING_HF;
 
             if (sendThenReceiveCommands(
-                    Proxmark3CommandNG.ng(op, tuneModePayload(lf,
+                    Proxmark3CommandNG.ng(op, Pm3TuneMode.toBytes(lf,
                             Proxmark3CommandNG.TUNE_MODE_START)),
                     new CommandWaiter(op, DEFAULT_TIMEOUT)) == null) {
                 throw new IOException(context.getString(R.string.tune_timeout));
             }
 
             try {
-                byte[] read = tuneModePayload(lf, Proxmark3CommandNG.TUNE_MODE_READ);
+                byte[] read = Pm3TuneMode.toBytes(lf, Proxmark3CommandNG.TUNE_MODE_READ);
 
                 while (sink.wantsMore()) {
                     Proxmark3CommandNG result = sendThenReceiveCommands(
@@ -419,22 +449,16 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
                         break;
                     }
 
-                    // HF answers with a uint16 on older firmware and a uint32 on current, which
-                    // can exceed 65.535V; the client accepts either.
-                    ByteBuffer bb = ByteBuffer.wrap(result.data);
-                    bb.order(ByteOrder.LITTLE_ENDIAN);
-
-                    if (result.data.length == 4) {
-                        sink.onVoltage(bb.getInt() & 0xffffffffL);
-                    } else if (result.data.length == 2) {
-                        sink.onVoltage(bb.getShort() & 0xffffL);
-                    } else {
+                    Long millivolts = Pm3TuneMode.parseVoltage(result.data);
+                    if (millivolts == null) {
                         break;
                     }
+
+                    sink.onVoltage(millivolts);
                 }
             } finally {
                 sendThenReceiveCommands(
-                        Proxmark3CommandNG.ng(op, tuneModePayload(lf,
+                        Proxmark3CommandNG.ng(op, Pm3TuneMode.toBytes(lf,
                                 Proxmark3CommandNG.TUNE_MODE_STOP)),
                         new CommandWaiter(op, DEFAULT_TIMEOUT));
             }
@@ -443,15 +467,9 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
         }
     }
 
-    private static byte[] tuneModePayload(boolean lf, int mode) {
-        return lf
-                ? new byte[]{(byte) mode, (byte) Proxmark3CommandNG.LF_DIVISOR_125}
-                : new byte[]{(byte) mode};
-    }
-
     /** The frequency the live LF measurement parks at, in Hz. */
     public static float getLiveTuneLfFrequency() {
-        return 12e6f / (Proxmark3CommandNG.LF_DIVISOR_125 + 1);
+        return Pm3AntennaTuning.divisorToFrequency(Proxmark3CommandNG.LF_DIVISOR_125);
     }
 
     public interface LiveTuneSink {
@@ -551,20 +569,10 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
             try {
                 HIDCardData hidCardData = (HIDCardData) getCardData();
 
-                boolean longFormat = hidCardData.data.bitLength() > 44;
-
-                // lf_hidsim_t: uint32 hi2, uint32 hi, uint32 lo, uint8 longFMT, bool Q5, bool EM.
-                ByteBuffer payload = ByteBuffer.allocate(15);
-                payload.order(ByteOrder.LITTLE_ENDIAN);
-                payload.putInt(hidCardData.data.shiftRight(64).intValue());
-                payload.putInt(hidCardData.data.shiftRight(32).intValue());
-                payload.putInt(hidCardData.data.intValue());
-                payload.put((byte) (longFormat ? 1 : 0));
-                payload.put((byte) 0); // Q5
-                payload.put((byte) 0); // EM
+                byte[] payload = Pm3LfHidSim.toBytes(hidCardData.data, false, false);
 
                 if (!proxmark3Device.sendThenReceiveCommands(
-                        Proxmark3CommandNG.ng(Proxmark3CommandNG.LF_HID_CLONE, payload.array()),
+                        Proxmark3CommandNG.ng(Proxmark3CommandNG.LF_HID_CLONE, payload),
                         new WatchdogReceiveSink<Proxmark3CommandNG, Boolean>(DEFAULT_TIMEOUT) {
                             @Override
                             public Boolean onReceived(Proxmark3CommandNG in) {
@@ -629,20 +637,16 @@ public class Proxmark3Device extends SerialCardDevice<Proxmark3CommandNG>
                         continue;
                     }
 
+                    Pm3Iso14aCardSelect cardSelect = Pm3Iso14aCardSelect.parse(result.data);
+                    if (cardSelect == null) {
+                        continue;
+                    }
+
                     ISO14443ACardData iso14443APart = new ISO14443ACardData();
-
-                    // iso14a_card_select_t, include/mifare.h: uint8 uid[10], uint8 uidlen,
-                    // uint8 atqa[2], uint8 sak, uint8 ats_len, uint8 ats[256].
-                    ByteBuffer bb = ByteBuffer.wrap(result.data);
-                    bb.order(ByteOrder.LITTLE_ENDIAN);
-
-                    byte[] uidBytes = new byte[10];
-                    bb.get(uidBytes);
-                    iso14443APart.uid = new BigInteger(ArrayUtils.subarray(uidBytes, 0, bb.get()));
-                    iso14443APart.atqa = bb.getShort();
-                    iso14443APart.sak = bb.get();
-                    iso14443APart.ats = new byte[bb.get() & 0xff];
-                    bb.get(iso14443APart.ats);
+                    iso14443APart.uid = cardSelect.getUid();
+                    iso14443APart.atqa = cardSelect.getAtqa();
+                    iso14443APart.sak = cardSelect.getSak();
+                    iso14443APart.ats = cardSelect.getAts();
 
                     if (!iso14443APart.equals(lastIso14443APart)) {
                         MifareCardData mifareCardData = new MifareCardData(iso14443APart, null);

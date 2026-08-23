@@ -1,8 +1,9 @@
-# Walrus
+# Iceman Fork - Project Walrus
+
 [![Build Status](https://img.shields.io/badge/status-alpha-orange.svg)](https://play.google.com/store/apps/details?id=com.bugfuzz.android.projectwalrus&pcampaignid=MKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1)
 [![GitHub release](https://img.shields.io/badge/release-v0.2.1-blue.svg)](https://github.com/TeamWalrus/Walrus/releases/)
 [![GPLv3 license](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://github.com/TeamWalrus/Walrus/blob/master/LICENSE)
-[![Slack invite](https://img.shields.io/badge/chat-on%20slack-00aac1.svg)](https://join.slack.com/t/walrusapp/shared_invite/enQtNDI0NDc1MDMzNDk0LTk5MTdhNWE4ZjBkNDBkOTkzY2EzMWE0ZWU3MDEwZjYzZmViZDFlZDQ5NDU1ZmZkZTdkMWVjMDVjYzkxZDFjODA)
+
 
 ## Intro
 
@@ -12,7 +13,8 @@ Designed for physical security assessors during red team engagements, Walrus sup
 
 ## Installing
 
-<a href="https://play.google.com/store/apps/details?id=com.bugfuzz.android.projectwalrus&amp;pcampaignid=MKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/images/generic/en_badge_web_generic.png" width="160"></a>
+Local debug build pushed over ADB
+
 
 ## Documentation
 
@@ -20,10 +22,15 @@ Designed for physical security assessors during red team engagements, Walrus sup
 
 
 ## Development
+This project haven't gotten love in many many years.  Another of these slowly dying open source projects.   After spending a bunch of Claude tokens it has been modified to run on latest Proxmark3/5 source by Iceman.
 
-Walrus is developed by Daniel Underhay and Matthew Daley (a.k.a. [Team Walrus](mailto:team@walrus.app)!) and is [![Open Source](https://badges.frapsoft.com/os/v1/open-source.png?v=103)](https://github.com/TeamWalrus/Walrus/blob/master/LICENSE)
+If it becomes stable enough I will push it upstream. 
+
+
+Originally Walrus is developed by Daniel Underhay and Matthew Daley (a.k.a. [Team Walrus](mailto:team@walrus.app)!) and is [![Open Source](https://badges.frapsoft.com/os/v1/open-source.png?v=103)](https://github.com/TeamWalrus/Walrus/blob/master/LICENSE)
 
 ## Building
+It builds nicely in VS Code too. 
 
 Walrus is a standard Android Studio project. At this stage there are no unusual dependencies or build steps beyond the usual cloning of the repository and opening the project in Android Studio.
 
@@ -54,29 +61,35 @@ The current layout of Walrus's source code is as follows:
     * `/util`: Miscellaneous.
 
 ## Hardware
-Team Walrus is powered by [Lab401](https://twitter.com/lab_401), our official hardware sponsor 🥳 Check out their [website](https://lab401.com/) for some great deals on hardware!
+Walrus connects via USB OTG cable or Bluetooth with 
+- Proxmark3 RDV4.01 w blueshark
+- Proxmark3 w built-in
+- Proxmark5 w BWM addon  ( untested )
+
 
 ## Device Support
 Here’s a table of the current devices / card type pairs we support and in what manner.
 
 **Key**: R = reading, W = writing, U = upload
 
-|                   | Proxmark3 Original | Pm3 Evo | Pm3 RDV4 | Pm3 Iceman Fork | Chameleon Mini Rev.G | C.M Rev.E Rebooted |
-|-----------------------|:------------------:|:-------:|:--------:|:---------------:|:--------------------:|:--------------:|
-| **HID Prox**          | R / W              | R / W   | R / W    | R / W           | -                    | -              |
-| **ISO14443A - UID**   | -                  | -       | -        |  -              | R / U                | U              |
-| **Mifare Ultralight** | -                  | -       | -        |  -              | -                    | -              |
-| **Mifare Classic 1K** | R / W              | R / W   | R / W    | R / W           | U                    | U              |
-| **Mifare Classic 4K** | ?                  | ?       | ?        | ?               | ?                    | ?              |
-| **Mifare Classic 4B** | ?                  | ?       | ?        | ?               | ?                    | ?              |
-| **Mifare Classic 7B** | ?                  | ?       | ?        | ?               | ?                    | ?              |
-| **Mifare DESFire**    | ?                  | ?       | ?        | ?               | ?                    | ?              |
+|                       | Pm3     | Pm5    | Chameleon Mini | Chameleon Mini | Chameleon |
+|                       |         |        | Rev.G          | Rev.E Rebooted | Ultra     |
+|-----------------------|:-------:|:------:|:--------------:|:--------------:|:---------:|
+| **HID Prox**          |  R / W  | ?      | -              | -              | ?         |
+| **ISO14443A - UID**   |  -      | ?      | R / U          | U              | ?         |
+| **Mifare Ultralight** |  -      | ?      | -              | -              | ?         |
+| **Mifare Classic 1K** |  R / W  | ?      | U              | U              | ?         |
+| **Mifare Classic 4K** |  ?      | ?      | ?              | ?              | ?         |
+| **Mifare Classic 4B** |  ?      | ?      | ?              | ?              | ?         |
+| **Mifare Classic 7B** |  ?      | ?      | ?              | ?              | ?         |
+| **Mifare DESFire**    |  ?      | ?      | ?              | ?              | ?         |
 
+
+_This table is based on older devices still, I kept some which might be in use today_
 
 ## Contributing
 
 We welcome all kinds of contributions and bug reports, big or small! Development takes place at our [GitHub repository](https://github.com/TeamWalrus/Walrus). There you can file issues (both bugs and enhancement requests) and submit pull requests.
-Feel free to join our [Slack channel](https://join.slack.com/t/walrusapp/shared_invite/enQtNDI0NDc1MDMzNDk0LTk5MTdhNWE4ZjBkNDBkOTkzY2EzMWE0ZWU3MDEwZjYzZmViZDFlZDQ5NDU1ZmZkZTdkMWVjMDVjYzkxZDFjODA). 
 
 During the initial development of Walrus, changes to the codebase are likely to be frequent and wide-ranging, so if you want to work on a feature, it's wise to reach out first to ensure that your hard work won't be soon obsoleted. After our first full release we hope to gain stability and bring in some of the additional resources expected of a project today, such as a proper test suite and continuous integration.
 

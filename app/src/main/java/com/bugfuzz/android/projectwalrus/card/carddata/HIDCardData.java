@@ -150,6 +150,19 @@ public class HIDCardData extends CardData implements ComponentSourceAndSink {
                                 new OpaqueElement("card_number", cardNumber, 1, 19, false),
                                 new ParityElement(null, null, 36, 1, 18, 1, 0, 18, true),
                                 new ParityElement(null, null, 0, 1, 1, 1, 0, 18, false)
+                        ), "FC %2$d, CN %3$d"),
+
+                // 48 bit cards carry their start sentinel at bit 48 and, unlike the other
+                // formats wider than 37 bits, no extended length header; see add_HID_header()
+                // in the Proxmark3 client's wiegand_formatutils.c.
+                new BinaryFormat(context.getString(R.string.hid_48_bit_corporate_1000),
+                        Arrays.asList(
+                                new FixedElement(null, null, 48, null, BigInteger.ONE),
+                                new OpaqueElement("facility_code", facilityCode, 1 + 23, 22, false),
+                                new OpaqueElement("card_number", cardNumber, 1, 23, false),
+                                new ParityElement(null, null, 46, 1, 1, 2, 1, 30, true),
+                                new ParityElement(null, null, 0, 1, 2, 2, 1, 30, false),
+                                new ParityElement(null, null, 47, 1, 0, 1, 0, 47, false)
                         ), "FC %2$d, CN %3$d")
         };
     }

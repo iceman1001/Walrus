@@ -310,9 +310,12 @@ Do these in order; each is independently shippable.
    firmware line to be distinguished *from*. Move the surviving class's
    `@UsbIds` annotation across unchanged. Biggest win, and it shrinks every
    later step. ~1 day.
-2. **Parse capabilities at connect.** Add a `Pm3Capabilities` value type, query
-   `0x0112` on connect, cache it, log it. Behaviour otherwise unchanged.
-   ~half a day.
+2. ~~**Parse capabilities at connect.**~~ **Done.** `Pm3Capabilities.java`
+   parses the struct; `Proxmark3Device.getCapabilities()` queries `0x0112` on
+   first use, caches it for the connection, and logs it;
+   `Proxmark3Activity` warms the cache once the version fetch has released the
+   device lock. 10 JVM unit tests in `Pm3CapabilitiesTest`. No UI surface yet
+   and nothing gates on it — that is step 3.
 3. **Gate features on flags** per the §4 map, replacing any hardcoded
    assumptions about LF/HF availability. ~half a day.
 4. **Add PM5-only extras** (`CMD_PM5_RGB_SET`, dual-frequency tune) behind
@@ -320,6 +323,28 @@ Do these in order; each is independently shippable.
 
 Step 1 first, deliberately: doing it before step 2 means the capabilities
 handshake gets written once instead of twice.
+
+### Payload structs
+
+Most NG opcodes carry a real C struct as their payload, not loose bytes, and
+those layouts are the part most likely to drift as the firmware moves. Each one
+now has a named Java type beside `Pm3Capabilities` rather than open-coded
+`ByteBuffer` arithmetic at the call site:
+
+| Java type | C declaration | Where it is declared |
+|---|---|---|
+| `Pm3Capabilities` | `capabilities_t` | `include/pm3_cmd.h` |
+| `Pm3VersionInfo` | `struct p` in `SendVersion()` | `armsrc/appmain.c` |
+| `Pm3AntennaTuning` | `struct p` in `MeasureAntennaTuning()` | `armsrc/appmain.c` |
+| `Pm3TuneMode` | (no struct: raw mode/divisor bytes) | `armsrc/appmain.c` |
+| `Pm3MfReadBlock` | `mf_readblock_t` | `include/pm3_cmd.h` |
+| `Pm3LfHidSim` | `lf_hidsim_t` | `include/pm3_cmd.h` |
+| `Pm3Iso14aCardSelect` | `iso14a_card_select_t` | `include/mifare.h` |
+
+`Pm3Structs` holds the shared little-endian reader/writer helpers. Each type
+carries its `SIZE`, names the C declaration it mirrors in its javadoc, and
+returns null rather than throwing on a short payload. This is also the natural
+place for the opcode codegen and captured-frame fixtures to land.
 
 Steps 2 and 3 pair naturally with the opcode-codegen and fixture-replay tests
 discussed for `pm3_cmd.h`: capture one real capabilities response per board
@@ -353,9 +378,19 @@ without hardware attached.
 
 Two items remain; the rest are now settled.
 
-- [ ] **Capabilities bitfield ordering** on a real device (§5). Capture the
-      13-byte response from a board with known flags and store it as a test
-      fixture.
+- [ ] **Capabilities bitfield ordering** on a real device (§5). The parser is
+      written and unit-tested against the documented layout, but those tests
+      build their own payloads — they cannot confirm the layout is right.
+      With a board attached, open the Proxmark3 screen and read:
+
+      ```
+      adb logcat -s Proxmark3Device
+      ```
+
+      The logged line carries the decoded flags and the raw hex. On an RDV4,
+      `is_rdv4` must be set; on any working board, `compiled_with_lf` must be.
+      If those read false, the bit order is wrong. Then capture the 13 bytes
+      and add them to `Pm3CapabilitiesTest` as a real fixture.
 - [ ] **Whether `CMD_LF_HID_WATCH`'s status-only reply behaves identically on
       PM5 and PM3** — see the HID read-path problem in `MODERNIZE-PROMPT.md`.
       Needs one board of each type.

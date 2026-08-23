@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   ~ Copyright 2018 Daniel Underhay & Matthew Daley.
+  ~ Copyright 2026 Iceman
   ~
   ~ This file is part of Walrus.
   ~
@@ -324,6 +325,9 @@
     <!-- Shown in error message -->
     <string name="get_version_timeout">Timed out while getting version</string>
 
+    <!-- Card device status -->
+    <string name="getting_capabilities">Getting capabilities</string>
+
     <!-- Error message when operation performed on device that has already gone -->
     <string name="device_is_gone">Device is gone</string>
 
@@ -441,6 +445,9 @@
 
     <!-- Format type -->
     <string name="hid_37_bit_with_facility_code">HID 37-bit with Facility Code (H10304)</string>
+
+    <!-- Format type -->
+    <string name="hid_48_bit_corporate_1000">HID 48-bit Corporate 1000</string>
 
     <!-- Component label -->
     <string name="hid_data">Data (hex)</string>
